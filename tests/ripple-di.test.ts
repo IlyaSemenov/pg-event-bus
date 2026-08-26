@@ -1,6 +1,10 @@
 import { expect, it } from "bun:test"
 
-import { createEventChannelFactory, type EventBus } from "pg-event-bus"
+import {
+  createEventChannelFactory,
+  createTestEventBus,
+  type EventBusResource,
+} from "pg-event-bus"
 import { defineDependency, provide, withOverrides } from "ripple-di"
 
 interface CommentEvent {
@@ -8,7 +12,7 @@ interface CommentEvent {
 }
 
 const production = createTestEventBus()
-const useEventBus = defineDependency<EventBus>(() => production.bus)
+const useEventBus = defineDependency<EventBusResource>(() => production)
 const defineEventChannel = createEventChannelFactory(useEventBus)
 const commentEvents = defineEventChannel<CommentEvent>(
   (postId) => `post:${postId}:comment`,
@@ -18,7 +22,7 @@ it("resolves a scoped override after the domain channel is declared", async () =
   const test = createTestEventBus()
 
   await commentEvents.send("production", { commentId: "production-comment" })
-  await withOverrides(provide(useEventBus, test.bus), () =>
+  await withOverrides(provide(useEventBus, test), () =>
     commentEvents.send("test", { commentId: "test-comment" }),
   )
 
@@ -35,15 +39,3 @@ it("resolves a scoped override after the domain channel is declared", async () =
     },
   ])
 })
-
-function createTestEventBus() {
-  const calls: Array<{ event: string; payload: unknown }> = []
-  const bus: EventBus = {
-    async send(event, payload) {
-      calls.push({ event, payload })
-    },
-    async *on() {},
-  }
-
-  return { bus, calls }
-}

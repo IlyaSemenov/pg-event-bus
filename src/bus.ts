@@ -2,12 +2,9 @@ import { EventEmitter } from "node:events"
 
 import postgres from "postgres"
 
-import {
-  createEventChannelFactory,
-  type DefineEventChannel,
-  type EventBus,
-} from "./channel"
+import { createEventChannelFactory, type DefineEventChannel } from "./channel"
 import { decodeEventMessage, encodeEventMessage } from "./message"
+import type { EventBusResource } from "./resource"
 import { streamEvents } from "./stream"
 
 /** Encoded PostgreSQL notification passed to an application's publisher. */
@@ -46,13 +43,9 @@ export interface PgEventBusOptions {
  *
  * Publication is delegated to the application through the configured publisher.
  */
-export interface PgEventBus extends EventBus {
-  /** Resolves after the dedicated connection starts listening. */
-  ready: Promise<void>
+export interface PgEventBus extends EventBusResource {
   /** Defines a typed channel backed by this event bus. */
   defineEventChannel: DefineEventChannel
-  /** Stops the listener and completes active event streams. */
-  close(): Promise<void>
 }
 
 /**
@@ -62,11 +55,9 @@ export interface PgEventBus extends EventBus {
  */
 export function createPgEventBus(options: PgEventBusOptions): PgEventBus {
   const listener = postgres(options.connectionString)
-  const events = new EventEmitter()
+  const events = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
   let closed = false
-
-  events.setMaxListeners(0)
 
   function fail(error: Error) {
     busAbort.abort(error)

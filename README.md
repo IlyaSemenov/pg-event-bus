@@ -150,13 +150,7 @@ Skip this section if your application uses the concrete `eventBus` directly.
 With dependency injection, domain modules usually outlive a particular event bus binding.
 Create their channel factory from a function that resolves the current `EventBus` instead of binding channels to one instance.
 
-The following example uses [`ripple-di`](https://www.npmjs.com/package/ripple-di), but the same resolver pattern works with another DI container.
-
-Install it separately to follow this example.
-
-```sh
-npm install ripple-di
-```
+The following example uses [`ripple-di`](https://www.npmjs.com/package/ripple-di), but the same resolver pattern works with other DI containers.
 
 ### Application wiring
 
@@ -166,10 +160,11 @@ Register the production PostgreSQL bus and create the shared `defineEventChannel
 import {
   createEventChannelFactory,
   createPgEventBus,
+  type EventBusResource,
 } from "pg-event-bus"
 import { defineDependency } from "ripple-di"
 
-export const useEventBus = defineDependency(
+export const useEventBus = defineDependency<EventBusResource>(
   () => createPgEventBus({
     connectionString: databaseUrl,
     channel: "my-app",
@@ -184,6 +179,9 @@ export const useEventBus = defineDependency(
 
 export const defineEventChannel = createEventChannelFactory(useEventBus)
 ```
+
+The transport-independent `EventBusResource` contract lets the same dependency own readiness and disposal without exposing PostgreSQL-specific operations.
+Tests can therefore replace the complete dependency, including its startup lifecycle.
 
 ### Domain channel
 
@@ -202,25 +200,41 @@ export const commentEvents = defineEventChannel<CommentEvent>(
 Tests can replace the dependency without recreating domain channels that were declared when their modules loaded.
 
 ```ts
+import { createTestEventBus } from "pg-event-bus"
 import { provide, withOverrides } from "ripple-di"
-import type { EventBus } from "pg-event-bus"
 
-const sent: Array<{ event: string; payload: unknown }> = []
+const testEventBus = createTestEventBus()
 
-const testEventBus: EventBus = {
-  async send(event, payload) {
-    sent.push({ event, payload })
-  },
-  async *on() {},
-}
+afterEach(() => testEventBus.clearCalls())
 
-await withOverrides(
-  provide(useEventBus, testEventBus),
-  () => commentEvents.send("post-id", {
-    eventType: "created",
-    commentId: "comment-id",
-  }),
-)
+test("publishes a comment event through the override", async () => {
+  await withOverrides(
+    provide(useEventBus, testEventBus),
+    () => commentEvents.send("post-id", {
+      eventType: "created",
+      commentId: "comment-id",
+    }),
+  )
+
+  expect(testEventBus.calls).toEqual([
+    {
+      event: "post:post-id:comment",
+      payload: {
+        eventType: "created",
+        commentId: "comment-id",
+      },
+    },
+  ])
+})
 ```
+
+The in-memory test bus:
+
+- Records successful sends in `calls`.
+- Resolves `ready` immediately.
+- Delivers sends to active subscribers and honors their abort signals.
+- Clears only the recorded history with `clearCalls()`.
+- Reports active subscriptions through `getActiveSubscriptionCount()`.
+- Completes all active streams when closed.
 
 The factory calls `useEventBus()` when `send()` or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.
