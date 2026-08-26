@@ -11,11 +11,13 @@ export interface EventChannel<TPayload, TKey = string> {
 }
 
 /**
- * Transport-independent operations used by typed event channels.
+ * Transport-independent event bus with lifecycle management.
  *
  * Implementations publish and consume fully built event names.
  */
 export interface EventBus {
+  /** Resolves when the event bus is ready to receive events. */
+  ready: Promise<void>
   /** Publishes a payload under a fully built event name. */
   send(event: string, payload: unknown): Promise<void>
   /** Streams payloads published under a fully built event name until the signal aborts. */
@@ -23,6 +25,8 @@ export interface EventBus {
     event: string,
     signal?: AbortSignal,
   ): AsyncGenerator<TPayload, void, unknown>
+  /** Closes the event bus and completes its active event streams. */
+  close(): Promise<void>
 }
 
 /**
@@ -35,21 +39,33 @@ export type DefineEventChannel = <TPayload, TKey = string>(
 ) => EventChannel<TPayload, TKey>
 
 /**
+ * Creates a channel factory bound to one event bus.
+ */
+export function createEventChannelFactory(
+  eventBus: EventBus,
+): DefineEventChannel
+
+/**
  * Creates a channel factory backed by a lazily resolved event bus.
  *
  * The resolver runs for every `send()` and `on()` call so dependency-injection overrides apply to channels declared earlier.
  */
 export function createEventChannelFactory(
   getEventBus: () => EventBus,
+): DefineEventChannel
+
+export function createEventChannelFactory(
+  eventBusOrResolver: EventBus | (() => EventBus),
 ): DefineEventChannel {
-  function defineEventChannel<TPayload, TKey = string>(
-    buildName: (key: TKey) => string,
-  ): EventChannel<TPayload, TKey> {
-    return {
-      send: (key, payload) => getEventBus().send(buildName(key), payload),
-      on: (key, signal) => getEventBus().on<TPayload>(buildName(key), signal),
-    }
-  }
+  const getEventBus =
+    typeof eventBusOrResolver === "function"
+      ? eventBusOrResolver
+      : () => eventBusOrResolver
+
+  const defineEventChannel: DefineEventChannel = (buildName) => ({
+    send: (key, payload) => getEventBus().send(buildName(key), payload),
+    on: (key, signal) => getEventBus().on(buildName(key), signal),
+  })
 
   return defineEventChannel
 }

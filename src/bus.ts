@@ -2,9 +2,8 @@ import { EventEmitter } from "node:events"
 
 import postgres from "postgres"
 
-import { createEventChannelFactory, type DefineEventChannel } from "./channel"
+import type { EventBus } from "./channel"
 import { decodeEventMessage, encodeEventMessage } from "./message"
-import type { EventBusResource } from "./resource"
 import { streamEvents } from "./stream"
 
 /** Encoded PostgreSQL notification passed to an application's publisher. */
@@ -39,21 +38,11 @@ export interface PgEventBusOptions {
 }
 
 /**
- * Event bus backed by one reconnecting PostgreSQL `LISTEN` connection.
- *
- * Publication is delegated to the application through the configured publisher.
- */
-export interface PgEventBus extends EventBusResource {
-  /** Defines a typed channel backed by this event bus. */
-  defineEventChannel: DefineEventChannel
-}
-
-/**
  * Creates a PostgreSQL event bus and starts its dedicated listener connection.
  *
  * The returned bus can publish immediately, while `ready` reports when `LISTEN` has become active.
  */
-export function createPgEventBus(options: PgEventBusOptions): PgEventBus {
+export function createPgEventBus(options: PgEventBusOptions): EventBus {
   const listener = postgres(options.connectionString)
   const events = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
@@ -114,15 +103,12 @@ export function createPgEventBus(options: PgEventBusOptions): PgEventBus {
     await listener.end()
   }
 
-  const eventBus: PgEventBus = {
+  return {
     ready,
     send,
     on: onEvent,
-    defineEventChannel: createEventChannelFactory(() => eventBus),
     close,
   }
-
-  return eventBus
 }
 
 function toError(error: unknown): Error {

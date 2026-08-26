@@ -3,7 +3,7 @@ import { expect, it } from "bun:test"
 import {
   createEventChannelFactory,
   createTestEventBus,
-  type EventBusResource,
+  type EventBus,
 } from "pg-event-bus"
 import { defineDependency, provide, withOverrides } from "ripple-di"
 
@@ -12,7 +12,7 @@ interface CommentEvent {
 }
 
 const production = createTestEventBus()
-const useEventBus = defineDependency<EventBusResource>(() => production)
+const useEventBus = defineDependency<EventBus>(() => production)
 const defineEventChannel = createEventChannelFactory(useEventBus)
 const commentEvents = defineEventChannel<CommentEvent>(
   (postId) => `post:${postId}:comment`,

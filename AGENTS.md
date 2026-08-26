@@ -24,8 +24,9 @@ The package owns the dedicated `LISTEN` connection, while applications inject pu
 Postgres.js manages the listener connection and reconnection lifecycle.
 The package is ORM-agnostic and contains no ORM-specific adapters.
 
-`createEventChannelFactory` resolves its `EventBus` when `send()` or `on()` runs.
+When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()` or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
+When it receives an `EventBus` directly, channels remain bound to that instance.
 
 ## Documentation
 

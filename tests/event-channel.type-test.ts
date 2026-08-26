@@ -1,4 +1,4 @@
-import type { PgEventBus } from "pg-event-bus"
+import { createEventChannelFactory, type EventBus } from "pg-event-bus"
 
 interface CommentEvent {
   commentId: string
@@ -13,12 +13,13 @@ interface SessionKey {
   scope: string
 }
 
-declare const eventBus: PgEventBus
+declare const eventBus: EventBus
+const defineEventChannel = createEventChannelFactory(eventBus)
 
-const commentEvents = eventBus.defineEventChannel<CommentEvent>(
+const commentEvents = defineEventChannel<CommentEvent>(
   (postId) => `post:${postId}:comment`,
 )
-const chatEvents = eventBus.defineEventChannel<ChatEvent, SessionKey>(
+const chatEvents = defineEventChannel<ChatEvent, SessionKey>(
   (session) => `chat:${session.userId}:${session.scope}`,
 )
 

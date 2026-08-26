@@ -1,3 +1,3 @@
-import { createTestEventBus, type EventBusResource } from "pg-event-bus"
+import { createTestEventBus, type EventBus } from "pg-event-bus"
 
-const testEventBus: EventBusResource = createTestEventBus()
+const testEventBus: EventBus = createTestEventBus()

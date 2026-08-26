@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events"
 
-import type { EventBusResource } from "./resource"
+import type { EventBus } from "./channel"
 import { streamEvents } from "./stream"
 
 /** One event sent through a test event bus. */
@@ -14,9 +14,9 @@ export interface TestEventBusCall {
 /**
  * In-memory event bus with test instrumentation.
  *
- * It can be passed directly to dependencies that accept an {@link EventBusResource}.
+ * It can be passed directly to dependencies that accept an {@link EventBus}.
  */
-export interface TestEventBus extends EventBusResource {
+export interface TestEventBus extends EventBus {
   /** Successful sends recorded in call order. */
   readonly calls: readonly TestEventBusCall[]
   /** Clears the recorded calls without affecting active subscriptions. */

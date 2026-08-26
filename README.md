@@ -49,6 +49,14 @@ It maps an application key to an event name, and all its events share one payloa
 
 Define as many event channels on a bus as you need; they all travel through the single PostgreSQL channel of their bus.
 
+Create a channel factory bound to the bus:
+
+```ts
+import { createEventChannelFactory } from "pg-event-bus"
+
+const defineEventChannel = createEventChannelFactory(eventBus)
+```
+
 The following channel uses a post ID as its key and accepts one payload type.
 
 ```ts
@@ -57,7 +65,7 @@ interface CommentEvent {
   commentId: string
 }
 
-export const commentEvents = eventBus.defineEventChannel<CommentEvent>(
+export const commentEvents = defineEventChannel<CommentEvent>(
   postId => `post:${postId}:comment`,
 )
 ```
@@ -66,7 +74,7 @@ Event keys are strings by default.
 Pass a second generic argument only when a channel uses another key type.
 
 ```ts
-eventBus.defineEventChannel<ChatEvent, SessionKey>(
+defineEventChannel<ChatEvent, SessionKey>(
   session => `chat:${session.userId}:${session.scope}`,
 )
 ```
@@ -160,11 +168,11 @@ Register the production PostgreSQL bus and create the shared `defineEventChannel
 import {
   createEventChannelFactory,
   createPgEventBus,
-  type EventBusResource,
+  type EventBus,
 } from "pg-event-bus"
 import { defineDependency } from "ripple-di"
 
-export const useEventBus = defineDependency<EventBusResource>(
+export const useEventBus = defineDependency<EventBus>(
   () => createPgEventBus({
     connectionString: databaseUrl,
     channel: "my-app",
@@ -180,8 +188,7 @@ export const useEventBus = defineDependency<EventBusResource>(
 export const defineEventChannel = createEventChannelFactory(useEventBus)
 ```
 
-The transport-independent `EventBusResource` contract lets the same dependency own readiness and disposal without exposing PostgreSQL-specific operations.
-Tests can therefore replace the complete dependency, including its startup lifecycle.
+The transport-independent `EventBus` contract lets tests replace the complete dependency, including its startup lifecycle.
 
 ### Domain channel
 

@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, expect, it } from "bun:test"
 
-import { createPgEventBus, type PgEventBus } from "pg-event-bus"
+import {
+  createEventChannelFactory,
+  createPgEventBus,
+  type EventBus,
+} from "pg-event-bus"
 import postgres from "postgres"
 
 interface TestEvent {
@@ -14,7 +18,7 @@ const listenerApplicationName = `${postgresChannel}_listener`
 const querySeparator = connectionString.includes("?") ? "&" : "?"
 const listenerConnectionString = `${connectionString}${querySeparator}application_name=${listenerApplicationName}`
 const publisher = postgres(connectionString, { max: 1 })
-let bus: PgEventBus
+let bus: EventBus
 
 beforeAll(async () => {
   bus = createPgEventBus({
@@ -33,7 +37,9 @@ afterAll(async () => {
 })
 
 it("delivers typed events between separate PostgreSQL connections", async () => {
-  const events = bus.defineEventChannel<TestEvent>((key) => `test:${key}`)
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `test:${key}`,
+  )
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -49,7 +55,9 @@ it("delivers typed events between separate PostgreSQL connections", async () => 
 })
 
 it("delivers a notification only after its publishing transaction commits", async () => {
-  const events = bus.defineEventChannel<TestEvent>((key) => `commit:${key}`)
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `commit:${key}`,
+  )
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -67,7 +75,9 @@ it("delivers a notification only after its publishing transaction commits", asyn
 })
 
 it("does not deliver a notification from a rolled-back transaction", async () => {
-  const events = bus.defineEventChannel<TestEvent>((key) => `rollback:${key}`)
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `rollback:${key}`,
+  )
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -82,7 +92,9 @@ it("does not deliver a notification from a rolled-back transaction", async () =>
 })
 
 it("keeps active streams subscribed after the listener reconnects", async () => {
-  const events = bus.defineEventChannel<TestEvent>((key) => `reconnect:${key}`)
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `reconnect:${key}`,
+  )
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -100,7 +112,9 @@ it("keeps active streams subscribed after the listener reconnects", async () => 
 })
 
 it("ignores malformed notifications without closing active streams", async () => {
-  const events = bus.defineEventChannel<TestEvent>((key) => `malformed:${key}`)
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `malformed:${key}`,
+  )
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -123,7 +137,7 @@ it("completes active streams when the bus closes", async () => {
   })
   await closingBus.ready
 
-  const events = closingBus.defineEventChannel<TestEvent>((key) => key)
+  const events = createEventChannelFactory(closingBus)<TestEvent>((key) => key)
   const stream = events.on("pending")
   const received = stream.next()
   await closingBus.close()
