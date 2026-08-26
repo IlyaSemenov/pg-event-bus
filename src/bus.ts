@@ -31,7 +31,11 @@ export type PublishPgNotification = (
 export interface PgEventBusOptions {
   /** PostgreSQL connection string used by the dedicated LISTEN connection. */
   connectionString: string
-  /** PostgreSQL channel shared by all domain events on this bus. */
+  /**
+   * PostgreSQL channel that carries every domain event of this bus.
+   *
+   * The package runs `LISTEN` on it, and the configured publisher runs `NOTIFY` on it.
+   */
   channel: string
   /** Publishes an encoded notification through the application's current database connection. */
   publish: PublishPgNotification

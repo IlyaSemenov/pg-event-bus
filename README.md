@@ -4,7 +4,7 @@ Typed realtime events over PostgreSQL `LISTEN` and `NOTIFY`.
 
 Use this package to propagate cache invalidations and live updates between application processes.
 
-The package owns a dedicated, reconnecting `LISTEN` connection while your application controls the connection used to publish notifications.
+The package owns a dedicated, reconnecting `LISTEN` connection, while your application controls the connection used to publish notifications, so events can be published inside your own transactions.
 
 ## Install
 
@@ -16,9 +16,7 @@ npm install pg-event-bus
 
 ## Create a bus
 
-Creating a bus immediately starts its dedicated PostgreSQL listener.
-
-Provide a `publish` function that executes `pg_notify` through your application's database client or ORM.
+Pass a `connectionString` for the package's own listener connection, the PostgreSQL notification channel of your application, and a `publish` function that runs `pg_notify` through your database client or ORM.
 
 ```ts
 import { createPgEventBus } from "pg-event-bus"
@@ -28,6 +26,7 @@ import { db } from "#db"
 
 const eventBus = createPgEventBus({
   connectionString: databaseUrl,
+  // Raw PostgreSQL channel name, used for both LISTEN and NOTIFY.
   channel: "my-app",
   async publish({ channel, payload }) {
     await db.sql`SELECT pg_notify(${channel}, ${payload})`
@@ -35,9 +34,20 @@ const eventBus = createPgEventBus({
 })
 ```
 
+Use one channel name per application, such as the application's own name.
+Every process of that application must pass the same name, and a different application sharing the database must pass another one.
+
+Forward the `channel` and `payload` arguments to `pg_notify` unchanged, and never build a channel name or a payload of your own.
+The `payload` argument is the encoded envelope that carries the event name and its data, not the payload you send.
+
+Creating a bus immediately starts its dedicated listener, which executes `LISTEN` on that channel.
+
 ## Define an event channel
 
-An event channel maps a typed application key to an internal event name.
+An event channel is a typed layer above the bus.
+It maps an application key to an event name, and all its events share one payload type.
+
+Define as many event channels on a bus as you need; they all travel through the single PostgreSQL channel of their bus.
 
 The following channel uses a post ID as its key and accepts one payload type.
 
@@ -82,12 +92,29 @@ for await (const event of commentEvents.on(postId, signal)) {
 
 Pass an `AbortSignal` to stop the stream when its consumer disconnects.
 
+## Transactions
+
+Always await `send()`.
+
+Send inside a transaction to tie the notification to it.
+PostgreSQL then delivers the notification after commit and discards it on rollback.
+
+This requires `publish` to run `pg_notify` on the transaction's own connection.
+Clients that route every query through the current transaction do that for you.
+Clients that expose the transaction as a separate handle need `publish` to pick that handle up, for example from an async-local context.
+
+For example, [`orchid-orm`](https://www.npmjs.com/package/orchid-orm) runs every query of a `$transaction` callback in that transaction, the publisher's `pg_notify` included:
+
+```ts
+await db.$transaction(async () => {
+  const commentId = await db.comment.insert({ postId, text }).get("id")
+  await commentEvents.send(postId, { eventType: "created", commentId })
+})
+```
+
 ## Listener readiness
 
-Creating a bus starts its dedicated listener in the background.
-
-`eventBus.ready` resolves after the listener has connected and executed `LISTEN`.
-Sending does not depend on this promise because `send()` uses the injected `publish` function.
+The `ready` promise resolves after the listener has connected and executed `LISTEN`.
 
 Await it during startup only when a receiving process must not report itself as ready before it can receive notifications.
 Notifications published before `LISTEN` becomes active can be missed.
@@ -104,20 +131,17 @@ Call `close()` during application shutdown to stop the PostgreSQL listener and c
 await eventBus.close()
 ```
 
-## Transactions
+## Delivery semantics
 
-`send()` waits for the injected `publish` function, so always await it.
+This package provides best-effort realtime signaling, not a durable queue.
+Disconnected listeners miss events, reconnects do not replay history, and delivery is not exactly once.
 
-To make notification delivery depend on a transaction, call `send()` through a publisher that uses that transaction's connection.
+Use an outbox, job queue, or durable broker when every event must be processed.
 
-```ts
-await db.transaction(async () => {
-  await updateComment()
-  await commentEvents.send(postId, event)
-})
-```
+Payloads use JSON serialization and must be JSON-serializable.
+Keep them small: PostgreSQL notification payloads must be shorter than 8000 bytes with the default configuration, and the encoded event name counts toward that limit.
 
-PostgreSQL delivers the notification after commit and discards it on rollback.
+PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
 
 ## Dependency injection
 
@@ -199,17 +223,4 @@ await withOverrides(
 )
 ```
 
-`createEventChannelFactory` calls `useEventBus()` when `send()` or `on()` runs, not when `commentEvents` is declared.
-The operation therefore uses the scoped test binding installed by `withOverrides`.
-
-## Delivery semantics
-
-This package provides best-effort realtime signaling, not a durable queue.
-Disconnected listeners miss events, reconnects do not replay history, and delivery is not exactly once.
-
-Use an outbox, job queue, or durable broker when every event must be processed.
-
-Payloads use JSON serialization and must be JSON-serializable.
-Keep them small because PostgreSQL notification payloads must be shorter than 8000 bytes with the default configuration.
-
-PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
+The factory calls `useEventBus()` when `send()` or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.
