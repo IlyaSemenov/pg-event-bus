@@ -16,8 +16,16 @@ export interface EventChannel<TPayload, TKey = string> {
   send(key: TKey, payload: TPayload): Promise<void>
   /** Publishes several typed events as one transport batch. */
   sendMany(events: readonly EventChannelEvent<TPayload, TKey>[]): Promise<void>
-  /** Streams payloads published under the event name built from `key` until the signal aborts. */
-  on(key: TKey, signal?: AbortSignal): AsyncGenerator<TPayload, void, unknown>
+  /**
+   * Streams payloads published under the event name built from `key` until the signal aborts.
+   *
+   * Pass a compatible subtype explicitly when the application contract associates the key with a narrower part of the channel payload.
+   * This key-to-subtype relationship is trusted and is not validated at runtime.
+   */
+  on<TEvent extends TPayload = TPayload>(
+    key: TKey,
+    signal?: AbortSignal,
+  ): AsyncGenerator<TEvent, void, unknown>
 }
 
 /** One event passed to an {@link EventBus} batch. */

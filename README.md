@@ -112,6 +112,22 @@ for await (const event of commentEvents.on(postId, signal)) {
 
 Pass an `AbortSignal` to stop the stream when its consumer disconnects.
 
+When a channel has a union payload and the application contract associates a key with one of its subtypes, pass that subtype explicitly to `on()`.
+
+```ts
+type ActivityEvent = CommentCreatedEvent | CommentDeletedEvent
+
+const activityEvents = defineEventChannel<ActivityEvent>(
+  scope => `activity:${scope}`,
+)
+
+for await (const event of activityEvents.on<CommentCreatedEvent>("created")) {
+  console.log(event.commentId)
+}
+```
+
+The subtype must extend the channel payload type, and the key-to-subtype relationship is trusted rather than checked at runtime.
+
 ## Transactions
 
 Always await `send()` and `sendMany()`.

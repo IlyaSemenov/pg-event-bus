@@ -13,6 +13,18 @@ interface SessionKey {
   scope: string
 }
 
+interface CreatedActivity {
+  kind: "created"
+  commentId: string
+}
+
+interface DeletedActivity {
+  kind: "deleted"
+  commentId: string
+}
+
+type ActivityEvent = CreatedActivity | DeletedActivity
+
 declare const eventBus: EventBus
 const defineEventChannel = createEventChannelFactory(eventBus)
 
@@ -21,6 +33,9 @@ const commentEvents = defineEventChannel<CommentEvent>(
 )
 const chatEvents = defineEventChannel<ChatEvent, SessionKey>(
   (session) => `chat:${session.userId}:${session.scope}`,
+)
+const activityEvents = defineEventChannel<ActivityEvent>(
+  (scope) => `activity:${scope}`,
 )
 
 commentEvents.send("post-id", { commentId: "comment-id" })
@@ -38,6 +53,17 @@ chatEvents.sendMany([
     payload: { messageId: "message-id" },
   },
 ])
+
+const activityStream: AsyncGenerator<ActivityEvent, void, unknown> =
+  activityEvents.on("all")
+const createdActivityStream: AsyncGenerator<CreatedActivity, void, unknown> =
+  activityEvents.on<CreatedActivity>("created")
+
+void activityStream
+void createdActivityStream
+
+// @ts-expect-error Explicit narrowing must remain within the channel payload type.
+activityEvents.on<{ kind: "unrelated" }>("created")
 
 // @ts-expect-error String is the default key type.
 commentEvents.send({ postId: "post-id" }, { commentId: "comment-id" })
