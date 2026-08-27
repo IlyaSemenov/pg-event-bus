@@ -11,13 +11,17 @@ it("resolves the event bus lazily for dependency injection", async () => {
 
   await events.send("one", { id: "first" })
   current = bus2.bus
-  await events.send("two", { id: "second" })
+  await events.sendMany([
+    { key: "two", payload: { id: "second" } },
+    { key: "three", payload: { id: "third" } },
+  ])
 
   expect(bus1.calls).toEqual([
     { event: "entity:one", payload: { id: "first" } },
   ])
   expect(bus2.calls).toEqual([
     { event: "entity:two", payload: { id: "second" } },
+    { event: "entity:three", payload: { id: "third" } },
   ])
 })
 
@@ -27,6 +31,9 @@ function createTestEventBus() {
     ready: Promise.resolve(),
     async send(event, payload) {
       calls.push({ event, payload })
+    },
+    async sendMany(events) {
+      calls.push(...events)
     },
     async *on() {},
     async close() {},

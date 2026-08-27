@@ -39,6 +39,27 @@ it("tracks a subscription cancelled by its consumer", async () => {
   expect(eventBus.getActiveSubscriptionCount()).toBe(0)
 })
 
+it("records and delivers a batch in order", async () => {
+  const eventBus = createTestEventBus()
+  const firstStream = eventBus.on<string>("first")
+  const secondStream = eventBus.on<string>("second")
+  const firstReceived = firstStream.next()
+  const secondReceived = secondStream.next()
+
+  await eventBus.sendMany([
+    { event: "first", payload: "one" },
+    { event: "second", payload: "two" },
+  ])
+
+  expect(await firstReceived).toEqual({ value: "one", done: false })
+  expect(await secondReceived).toEqual({ value: "two", done: false })
+  expect(eventBus.calls).toEqual([
+    { event: "first", payload: "one" },
+    { event: "second", payload: "two" },
+  ])
+  await eventBus.close()
+})
+
 it("closes all subscriptions and rejects later sends", async () => {
   const eventBus = createTestEventBus()
   const stream1 = eventBus.on("one")
@@ -56,6 +77,9 @@ it("closes all subscriptions and rejects later sends", async () => {
   expect(eventBus.getActiveSubscriptionCount()).toBe(0)
   await expect(eventBus.send("one", "payload")).rejects.toThrow(
     "Cannot send an event after the test event bus is closed",
+  )
+  await expect(eventBus.sendMany([])).rejects.toThrow(
+    "Cannot send events after the test event bus is closed",
   )
 
   const closedStream = eventBus.on("one")

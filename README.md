@@ -16,10 +16,10 @@ npm install pg-event-bus
 
 ## Create a bus
 
-Pass a `connectionString` for the package's own listener connection, the PostgreSQL notification channel of your application, and a `publish` function that runs `pg_notify` through your database client or ORM.
+Pass a `connectionString` for the package's own listener connection, the PostgreSQL notification channel of your application, and a `publisher` that sends a notification batch through your database client or ORM in one call.
 
 ```ts
-import { createPgEventBus } from "pg-event-bus"
+import { createPgEventBus, createPublisher } from "pg-event-bus"
 
 // Use your application's current database connection.
 import { db } from "#db"
@@ -28,17 +28,15 @@ const eventBus = createPgEventBus({
   connectionString: databaseUrl,
   // Raw PostgreSQL channel name, used for both LISTEN and NOTIFY.
   channel: "my-app",
-  async publish({ channel, payload }) {
-    await db.sql`SELECT pg_notify(${channel}, ${payload})`
-  },
+  publisher: createPublisher(query => db.query(query)),
 })
 ```
 
 Use one channel name per application, such as the application's own name.
 Every process of that application must pass the same name, and a different application sharing the database must pass another one.
 
-Forward the `channel` and `payload` arguments to `pg_notify` unchanged, and never build a channel name or a payload of your own.
-The `payload` argument is the encoded envelope that carries the event name and its data, not the payload you send.
+`createPublisher()` passes its callback a parameterized `pg_notify` query as `{ text, values }`, which the callback executes through the application's current database connection.
+If your database client uses a different query API, build a custom adapter with [createRawPublisher()](#custom-adapters).
 
 Creating a bus immediately starts its dedicated listener, which executes `LISTEN` on that channel.
 
@@ -90,6 +88,20 @@ await commentEvents.send(postId, {
 })
 ```
 
+Call `sendMany()` to publish several events in one database call.
+
+```ts
+await commentEvents.sendMany(
+  comments.map(comment => ({
+    key: comment.postId,
+    payload: {
+      eventType: "created",
+      commentId: comment.id,
+    },
+  })),
+)
+```
+
 Call `on()` to consume matching events as an `AsyncIterable`.
 
 ```ts
@@ -102,14 +114,14 @@ Pass an `AbortSignal` to stop the stream when its consumer disconnects.
 
 ## Transactions
 
-Always await `send()`.
+Always await `send()` and `sendMany()`.
 
-Send inside a transaction to tie the notification to it.
+Send inside a transaction to tie the notification or notification batch to it.
 PostgreSQL then delivers the notification after commit and discards it on rollback.
 
-This requires `publish` to run `pg_notify` on the transaction's own connection.
+This requires the `publisher` to run every `pg_notify` on the transaction's own connection.
 Clients that route every query through the current transaction do that for you.
-Clients that expose the transaction as a separate handle need `publish` to pick that handle up, for example from an async-local context.
+Clients that expose the transaction as a separate handle need the `publisher` to pick that handle up, for example from an async-local context.
 
 For example, [`orchid-orm`](https://www.npmjs.com/package/orchid-orm) runs every query of a `$transaction` callback in that transaction, the publisher's `pg_notify` included:
 
@@ -139,6 +151,37 @@ Call `close()` during application shutdown to stop the PostgreSQL listener and c
 await eventBus.close()
 ```
 
+## Custom adapters
+
+An adapter that cannot execute the `{ text, values }` query produced by `createPublisher()` can use `createRawPublisher()` as an escape hatch.
+
+```ts
+import { createRawPublisher } from "pg-event-bus"
+import { db } from "#db"
+import { sql } from "#db/base-table"
+
+export const publisher = createRawPublisher(notifications =>
+  db.$query(
+    sql({
+      raw: `
+        SELECT pg_notify(
+          notification.value->>'channel',
+          notification.value->>'payload'
+        )
+        FROM jsonb_array_elements($notifications::jsonb)
+        WITH ORDINALITY AS notification(value, position)
+        ORDER BY notification.position
+      `,
+      values: {
+        notifications: JSON.stringify(notifications),
+      },
+    }),
+  )
+)
+```
+
+This Orchid ORM adapter publishes the complete array in one database call, preserves its order, and uses the current transaction connection.
+
 ## Delivery semantics
 
 This package provides best-effort realtime signaling, not a durable queue.
@@ -165,20 +208,15 @@ The following example uses [`ripple-di`](https://www.npmjs.com/package/ripple-di
 Register the production PostgreSQL bus and create the shared `defineEventChannel` function from its resolver.
 
 ```ts
-import {
-  createEventChannelFactory,
-  createPgEventBus,
-  type EventBus,
-} from "pg-event-bus"
+import { createEventChannelFactory, createPgEventBus } from "pg-event-bus"
 import { defineDependency } from "ripple-di"
+import { publisher } from "#events/publisher"
 
-export const useEventBus = defineDependency<EventBus>(
+export const useEventBus = defineDependency(
   () => createPgEventBus({
     connectionString: databaseUrl,
     channel: "my-app",
-    async publish({ channel, payload }) {
-      await db.sql`SELECT pg_notify(${channel}, ${payload})`
-    },
+    publisher,
   }),
   {
     dispose: eventBus => eventBus.close(),
@@ -237,11 +275,11 @@ test("publishes a comment event through the override", async () => {
 
 The in-memory test bus:
 
-- Records successful sends in `calls`.
+- Records successful individual and batch sends in `calls`.
 - Resolves `ready` immediately.
 - Delivers sends to active subscribers and honors their abort signals.
 - Clears only the recorded history with `clearCalls()`.
 - Reports active subscriptions through `getActiveSubscriptionCount()`.
 - Completes all active streams when closed.
 
-The factory calls `useEventBus()` when `send()` or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.
+The factory calls `useEventBus()` when `send()`, `sendMany()`, or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.

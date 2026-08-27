@@ -23,8 +23,10 @@ Listener and publisher ownership is asymmetric.
 The package owns the dedicated `LISTEN` connection, while applications inject publication through their current database connection.
 Postgres.js manages the listener connection and reconnection lifecycle.
 The package is ORM-agnostic and contains no ORM-specific adapters.
+`createPublisher` builds one parameterized `pg_notify` query and delegates its execution to the application's current database connection.
+`createRawPublisher` delegates the readonly notification array instead, including when `send()` publishes one event.
 
-When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()` or `on()` runs.
+When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()`, `sendMany()`, or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
 When it receives an `EventBus` directly, channels remain bound to that instance.
 

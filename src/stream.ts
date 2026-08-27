@@ -1,7 +1,7 @@
 import { type EventEmitter, on } from "node:events"
 
 export async function* streamEvents<TPayload>(
-  events: EventEmitter,
+  eventEmitter: EventEmitter,
   event: string,
   busSignal: AbortSignal,
   userSignal?: AbortSignal,
@@ -11,7 +11,7 @@ export async function* streamEvents<TPayload>(
     : busSignal
 
   try {
-    for await (const [payload] of on(events, event, { signal })) {
+    for await (const [payload] of on(eventEmitter, event, { signal })) {
       yield payload as TPayload
     }
   } catch (error) {

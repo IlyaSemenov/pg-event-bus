@@ -3,6 +3,7 @@ import { afterAll, beforeAll, expect, it } from "bun:test"
 import {
   createEventChannelFactory,
   createPgEventBus,
+  createPublisher,
   type EventBus,
 } from "pg-event-bus"
 import postgres from "postgres"
@@ -17,23 +18,24 @@ const postgresChannel = `pg_event_bus_${process.pid}_${Date.now()}`
 const listenerApplicationName = `${postgresChannel}_listener`
 const querySeparator = connectionString.includes("?") ? "&" : "?"
 const listenerConnectionString = `${connectionString}${querySeparator}application_name=${listenerApplicationName}`
-const publisher = postgres(connectionString, { max: 1 })
+const sql = postgres(connectionString, { max: 1 })
+const publisher = createPublisher(({ text, values }) =>
+  sql.unsafe(text, values),
+)
 let bus: EventBus
 
 beforeAll(async () => {
   bus = createPgEventBus({
     connectionString: listenerConnectionString,
     channel: postgresChannel,
-    async publish({ channel, payload }) {
-      await publisher`SELECT pg_notify(${channel}, ${payload})`
-    },
+    publisher,
   })
   await bus.ready
 })
 
 afterAll(async () => {
   await bus.close()
-  await publisher.end()
+  await sql.end()
 })
 
 it("delivers typed events between separate PostgreSQL connections", async () => {
@@ -54,6 +56,31 @@ it("delivers typed events between separate PostgreSQL connections", async () => 
   expect(await stream.next()).toEqual({ value: undefined, done: true })
 })
 
+it("delivers a publication batch in input order", async () => {
+  const events = createEventChannelFactory(bus)<TestEvent>(
+    (key) => `batch:${key}`,
+  )
+  const controller = new AbortController()
+  const stream = events.on("same", controller.signal)
+  const firstReceived = stream.next()
+  const secondReceived = stream.next()
+
+  await events.sendMany([
+    { key: "same", payload: { id: "event-1", value: 1 } },
+    { key: "same", payload: { id: "event-2", value: 2 } },
+  ])
+
+  expect(await firstReceived).toEqual({
+    value: { id: "event-1", value: 1 },
+    done: false,
+  })
+  expect(await secondReceived).toEqual({
+    value: { id: "event-2", value: 2 },
+    done: false,
+  })
+  controller.abort()
+})
+
 it("delivers a notification only after its publishing transaction commits", async () => {
   const events = createEventChannelFactory(bus)<TestEvent>(
     (key) => `commit:${key}`,
@@ -62,11 +89,11 @@ it("delivers a notification only after its publishing transaction commits", asyn
   const stream = events.on("first", controller.signal)
   const received = stream.next()
 
-  await publisher`BEGIN`
+  await sql`BEGIN`
   await events.send("first", { id: "committed", value: 1 })
   expect(await settlesWithin(received, 75)).toBe(false)
 
-  await publisher`COMMIT`
+  await sql`COMMIT`
   expect(await received).toEqual({
     value: { id: "committed", value: 1 },
     done: false,
@@ -82,9 +109,9 @@ it("does not deliver a notification from a rolled-back transaction", async () =>
   const stream = events.on("first", controller.signal)
   const received = stream.next()
 
-  await publisher`BEGIN`
+  await sql`BEGIN`
   await events.send("first", { id: "rolled-back", value: 1 })
-  await publisher`ROLLBACK`
+  await sql`ROLLBACK`
 
   expect(await settlesWithin(received, 75)).toBe(false)
   controller.abort()
@@ -100,7 +127,7 @@ it("keeps active streams subscribed after the listener reconnects", async () => 
   const received = stream.next()
   const listenerPid = await waitForListenerPid()
 
-  await publisher`SELECT pg_terminate_backend(${listenerPid})`
+  await sql`SELECT pg_terminate_backend(${listenerPid})`
   await waitForListenerPid(listenerPid)
   await events.send("first", { id: "after-reconnect", value: 2 })
 
@@ -119,7 +146,7 @@ it("ignores malformed notifications without closing active streams", async () =>
   const stream = events.on("first", controller.signal)
   const received = stream.next()
 
-  await publisher`SELECT pg_notify(${postgresChannel}, ${"not-json"})`
+  await sql`SELECT pg_notify(${postgresChannel}, ${"not-json"})`
   await events.send("first", { id: "after-malformed", value: 3 })
 
   expect(await received).toEqual({
@@ -133,7 +160,7 @@ it("completes active streams when the bus closes", async () => {
   const closingBus = createPgEventBus({
     connectionString,
     channel: `${postgresChannel}_close`,
-    publish() {},
+    publisher() {},
   })
   await closingBus.ready
 
@@ -176,7 +203,7 @@ async function waitForListenerPid(excludedPid?: number): Promise<number> {
   const deadline = Date.now() + 5_000
 
   while (Date.now() < deadline) {
-    const result = await publisher<{ pid: number }[]>`
+    const result = await sql<{ pid: number }[]>`
       SELECT pid
       FROM pg_stat_activity
       WHERE application_name = ${listenerApplicationName}

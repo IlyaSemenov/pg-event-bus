@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events"
 
-import type { EventBus } from "./channel"
+import type { EventBus, EventBusEvent } from "./channel"
 import { streamEvents } from "./stream"
 
 /** One event sent through a test event bus. */
@@ -31,7 +31,7 @@ export interface TestEventBus extends EventBus {
  * The bus supports consumer cancellation and closes all active streams when closed.
  */
 export function createTestEventBus(): TestEventBus {
-  const events = new EventEmitter().setMaxListeners(0)
+  const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
   const calls: TestEventBusCall[] = []
   let activeSubscriptionCount = 0
@@ -41,15 +41,34 @@ export function createTestEventBus(): TestEventBus {
       throw new Error("Cannot send an event after the test event bus is closed")
     }
 
+    deliver(event, payload)
+  }
+
+  async function sendMany(events: readonly EventBusEvent[]) {
+    if (busAbort.signal.aborted) {
+      throw new Error("Cannot send events after the test event bus is closed")
+    }
+
+    for (const { event, payload } of events) {
+      deliver(event, payload)
+    }
+  }
+
+  function deliver(event: string, payload: unknown) {
     calls.push({ event, payload })
-    events.emit(event, payload)
+    eventEmitter.emit(event, payload)
   }
 
   async function* onEvent<TPayload>(event: string, signal?: AbortSignal) {
     activeSubscriptionCount += 1
 
     try {
-      yield* streamEvents<TPayload>(events, event, busAbort.signal, signal)
+      yield* streamEvents<TPayload>(
+        eventEmitter,
+        event,
+        busAbort.signal,
+        signal,
+      )
     } finally {
       activeSubscriptionCount -= 1
     }
@@ -62,6 +81,7 @@ export function createTestEventBus(): TestEventBus {
   return {
     ready: Promise.resolve(),
     send,
+    sendMany,
     on: onEvent,
     close,
     calls,

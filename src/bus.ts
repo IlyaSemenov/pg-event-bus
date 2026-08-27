@@ -2,26 +2,10 @@ import { EventEmitter } from "node:events"
 
 import postgres from "postgres"
 
-import type { EventBus } from "./channel"
+import type { EventBus, EventBusEvent } from "./channel"
 import { decodeEventMessage, encodeEventMessage } from "./message"
+import type { PgEventPublisher } from "./publisher"
 import { streamEvents } from "./stream"
-
-/** Encoded PostgreSQL notification passed to an application's publisher. */
-export interface PgNotification {
-  /** PostgreSQL channel supplied when the event bus was created. */
-  channel: string
-  /** JSON-encoded event name and payload accepted by `pg_notify`. */
-  payload: string
-}
-
-/**
- * Publishes one encoded notification through an application-owned database connection.
- *
- * The returned value is awaited so a transaction cannot finish before publication completes.
- */
-export type PublishPgNotification = (
-  notification: PgNotification,
-) => unknown | PromiseLike<unknown>
 
 /** Configuration for a PostgreSQL event bus. */
 export interface PgEventBusOptions {
@@ -33,8 +17,8 @@ export interface PgEventBusOptions {
    * The package runs `LISTEN` on it, and the configured publisher runs `NOTIFY` on it.
    */
   channel: string
-  /** Publishes an encoded notification through the application's current database connection. */
-  publish: PublishPgNotification
+  /** Publishes encoded notifications through the application's current database connection. */
+  publisher: PgEventPublisher
 }
 
 /**
@@ -44,7 +28,7 @@ export interface PgEventBusOptions {
  */
 export function createPgEventBus(options: PgEventBusOptions): EventBus {
   const listener = postgres(options.connectionString)
-  const events = new EventEmitter().setMaxListeners(0)
+  const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
   let closed = false
 
@@ -56,7 +40,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
     const message = decodeEventMessage(payload)
 
     if (message) {
-      events.emit(message.event, message.payload)
+      eventEmitter.emit(message.event, message.payload)
     }
   }
 
@@ -83,14 +67,35 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
       )
     }
 
-    await options.publish({
-      channel: options.channel,
-      payload: encodeEventMessage(event, payload),
-    })
+    await options.publisher([
+      {
+        channel: options.channel,
+        payload: encodeEventMessage(event, payload),
+      },
+    ])
+  }
+
+  async function sendMany(events: readonly EventBusEvent[]) {
+    if (closed) {
+      throw new Error(
+        "Cannot send events after the PostgreSQL event bus is closed",
+      )
+    }
+
+    if (events.length === 0) {
+      return
+    }
+
+    await options.publisher(
+      events.map(({ event, payload }) => ({
+        channel: options.channel,
+        payload: encodeEventMessage(event, payload),
+      })),
+    )
   }
 
   function onEvent<TPayload>(event: string, signal?: AbortSignal) {
-    return streamEvents<TPayload>(events, event, busAbort.signal, signal)
+    return streamEvents<TPayload>(eventEmitter, event, busAbort.signal, signal)
   }
 
   async function close() {
@@ -106,6 +111,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   return {
     ready,
     send,
+    sendMany,
     on: onEvent,
     close,
   }
