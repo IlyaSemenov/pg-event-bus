@@ -158,29 +158,24 @@ An adapter that cannot execute the `{ text, values }` query produced by `createP
 ```ts
 import { createRawPublisher } from "pg-event-bus"
 import { db } from "#db"
-import { sql } from "#db/base-table"
 
 export const publisher = createRawPublisher(notifications =>
-  db.$query(
-    sql({
-      raw: `
-        SELECT pg_notify(
-          notification.value->>'channel',
-          notification.value->>'payload'
-        )
-        FROM jsonb_array_elements($notifications::jsonb)
-        WITH ORDINALITY AS notification(value, position)
-        ORDER BY notification.position
-      `,
-      values: {
-        notifications: JSON.stringify(notifications),
-      },
-    }),
-  )
+  db.executeSql({
+    raw: `
+      SELECT pg_notify(
+        notification.value->>'channel',
+        notification.value->>'payload'
+      )
+      FROM jsonb_array_elements($notifications::jsonb)
+      WITH ORDINALITY AS notification(value, position)
+      ORDER BY notification.position
+    `,
+    values: {
+      notifications: JSON.stringify(notifications),
+    },
+  }),
 )
 ```
-
-This Orchid ORM adapter publishes the complete array in one database call, preserves its order, and uses the current transaction connection.
 
 ## Delivery semantics
 
