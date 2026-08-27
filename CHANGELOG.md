@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.1.0
+
+### Minor Changes
+
+- d4a0722: Narrow `EventChannel.on<TEvent>()` to a compatible payload subtype when your application knows the event contract for a specific key.
+
 ## 3.0.0
 
 ### Major Changes
