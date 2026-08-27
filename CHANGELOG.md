@@ -1,5 +1,12 @@
 # pg-event-bus
 
+## 3.0.0
+
+### Major Changes
+
+- 79fc814: Event channels now provide `sendMany()` for publishing multiple events in one database call.
+  Configure `createPgEventBus()` with `publisher: createPublisher(query => ...)` to publish events through your current database connection.
+
 ## 2.0.0
 
 ### Major Changes
