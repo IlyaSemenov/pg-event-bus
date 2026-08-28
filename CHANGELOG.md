@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.2.0
+
+### Minor Changes
+
+- 8b45fc0: Inspect payloads published to a typed event channel and key with `TestEventBus.payloadsFor()` without depending on transport event names.
+
 ## 3.1.0
 
 ### Minor Changes
