@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.3.0
+
+### Minor Changes
+
+- f4e7241: Bind a typed event channel with `TestEventBus.for()` to inspect payloads for keys associated with a narrower compatible payload subtype.
+
 ## 3.2.0
 
 ### Minor Changes
