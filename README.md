@@ -281,12 +281,20 @@ test("publishes a comment event through the override", async () => {
       },
     },
   ])
+
+  expect(testEventBus.payloadsFor(commentEvents, "post-id")).toEqual([
+    {
+      eventType: "created",
+      commentId: "comment-id",
+    },
+  ])
 })
 ```
 
 The in-memory test bus:
 
 - Records successful individual and batch sends in `calls`.
+- Returns typed payload snapshots for a channel and key through `payloadsFor()`.
 - Resolves `ready` immediately.
 - Delivers sends to active subscribers and honors their abort signals.
 - Clears only the recorded history with `clearCalls()`.

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events"
 
-import type { EventBus, EventBusEvent } from "./channel"
+import type { EventBus, EventBusEvent, EventChannel } from "./channel"
+import { resolveEventChannelName } from "./channel-name"
 import { streamEvents } from "./stream"
 
 /** One event sent through a test event bus. */
@@ -19,6 +20,11 @@ export interface TestEventBusCall {
 export interface TestEventBus extends EventBus {
   /** Successful sends recorded in call order. */
   readonly calls: readonly TestEventBusCall[]
+  /** Returns a snapshot of payloads sent to a channel created by {@link createEventChannelFactory} under `key`. */
+  payloadsFor<TPayload, TKey>(
+    channel: EventChannel<TPayload, TKey>,
+    key: TKey,
+  ): readonly TPayload[]
   /** Clears the recorded calls without affecting active subscriptions. */
   clearCalls(): void
   /** Returns the number of active event subscriptions. */
@@ -78,6 +84,17 @@ export function createTestEventBus(): TestEventBus {
     busAbort.abort()
   }
 
+  function payloadsFor<TPayload, TKey>(
+    channel: EventChannel<TPayload, TKey>,
+    key: TKey,
+  ): readonly TPayload[] {
+    const event = resolveEventChannelName(channel, key)
+
+    return calls
+      .filter((call) => call.event === event)
+      .map((call) => call.payload as TPayload)
+  }
+
   return {
     ready: Promise.resolve(),
     send,
@@ -85,6 +102,7 @@ export function createTestEventBus(): TestEventBus {
     on: onEvent,
     close,
     calls,
+    payloadsFor,
     clearCalls() {
       calls.length = 0
     },

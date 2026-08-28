@@ -1,5 +1,6 @@
 import { expect, it } from "bun:test"
 
+import { createEventChannelFactory } from "./channel"
 import { createTestEventBus } from "./test-bus"
 
 it("records and delivers events", async () => {
@@ -58,6 +59,49 @@ it("records and delivers a batch in order", async () => {
     { event: "second", payload: "two" },
   ])
   await eventBus.close()
+})
+
+it("returns payload snapshots for a typed channel and key", async () => {
+  const eventBus = createTestEventBus()
+  const defineEventChannel = createEventChannelFactory(eventBus)
+  const firstChannel = defineEventChannel<{ id: string }, { id: string }>(
+    (key) => `first:${key.id}`,
+  )
+  const secondChannel = defineEventChannel<{ id: string }>(
+    (key) => `second:${key}`,
+  )
+
+  await firstChannel.send({ id: "one" }, { id: "first" })
+  await secondChannel.send("one", { id: "other-channel" })
+  await firstChannel.sendMany([
+    { key: { id: "two" }, payload: { id: "other-key" } },
+    { key: { id: "one" }, payload: { id: "second" } },
+  ])
+
+  const payloads = eventBus.payloadsFor(firstChannel, { id: "one" })
+
+  expect(payloads).toEqual([{ id: "first" }, { id: "second" }])
+  const mutablePayloads = payloads as Array<{ id: string }>
+  mutablePayloads.push({ id: "snapshot-only" })
+  expect(eventBus.payloadsFor(firstChannel, { id: "one" })).toEqual([
+    { id: "first" },
+    { id: "second" },
+  ])
+})
+
+it("rejects channels not created by the channel factory", () => {
+  const eventBus = createTestEventBus()
+
+  expect(() =>
+    eventBus.payloadsFor(
+      {
+        async send() {},
+        async sendMany() {},
+        async *on() {},
+      },
+      "key",
+    ),
+  ).toThrow("Expected an event channel created by createEventChannelFactory")
 })
 
 it("closes all subscriptions and rejects later sends", async () => {

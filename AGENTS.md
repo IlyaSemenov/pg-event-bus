@@ -29,6 +29,7 @@ The package is ORM-agnostic and contains no ORM-specific adapters.
 When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()`, `sendMany()`, or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
 When it receives an `EventBus` directly, channels remain bound to that instance.
+Keep each channel's event-name resolver in library-private metadata so test instrumentation can resolve logical channel keys without exposing transport names.
 
 ## Documentation
 

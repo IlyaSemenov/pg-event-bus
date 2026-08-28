@@ -1,3 +1,5 @@
+import { registerEventChannel } from "./channel-name"
+
 /** One typed event passed to an {@link EventChannel} batch. */
 export interface EventChannelEvent<TPayload, TKey = string> {
   /** Key used to build the concrete event name. */
@@ -90,17 +92,28 @@ export function createEventChannelFactory(
       ? eventBusOrResolver
       : () => eventBusOrResolver
 
-  const defineEventChannel: DefineEventChannel = (buildName) => ({
-    send: (key, payload) => getEventBus().send(buildName(key), payload),
-    sendMany: (events) =>
-      getEventBus().sendMany(
-        events.map(({ key, payload }) => ({
-          event: buildName(key),
-          payload,
-        })),
-      ),
-    on: (key, signal) => getEventBus().on(buildName(key), signal),
-  })
+  const defineEventChannel: DefineEventChannel = <TPayload, TKey = string>(
+    buildName: (key: TKey) => string,
+  ) => {
+    const channel: EventChannel<TPayload, TKey> = {
+      send: (key, payload) => getEventBus().send(buildName(key), payload),
+      sendMany: (events) =>
+        getEventBus().sendMany(
+          events.map(({ key, payload }) => ({
+            event: buildName(key),
+            payload,
+          })),
+        ),
+      on: <TEvent extends TPayload = TPayload>(
+        key: TKey,
+        signal?: AbortSignal,
+      ) => getEventBus().on<TEvent>(buildName(key), signal),
+    }
+
+    registerEventChannel(channel, buildName)
+
+    return channel
+  }
 
   return defineEventChannel
 }
