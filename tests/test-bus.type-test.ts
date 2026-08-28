@@ -4,9 +4,17 @@ import {
   type EventBus,
 } from "pg-event-bus"
 
-interface CommentEvent {
+interface CommentCreatedEvent {
+  type: "created"
   commentId: string
 }
+
+interface CommentDeletedEvent {
+  type: "deleted"
+  commentId: string
+}
+
+type CommentEvent = CommentCreatedEvent | CommentDeletedEvent
 
 interface SessionKey {
   userId: string
@@ -26,6 +34,29 @@ const payloads: readonly CommentEvent[] = instrumentedTestEventBus.payloadsFor(
 )
 
 void payloads
+
+const channelInspector = instrumentedTestEventBus.for(commentEvents)
+const inferredPayloads: readonly CommentEvent[] = channelInspector.payloadsFor({
+  userId: "user-id",
+  scope: "support",
+})
+const narrowedPayloads: readonly CommentCreatedEvent[] =
+  channelInspector.payloadsFor<CommentCreatedEvent>({
+    userId: "user-id",
+    scope: "support",
+  })
+
+void inferredPayloads
+void narrowedPayloads
+
+// @ts-expect-error Explicit narrowing must remain within the channel payload type.
+channelInspector.payloadsFor<{ type: "unrelated" }>({
+  userId: "user-id",
+  scope: "support",
+})
+
+// @ts-expect-error The key must match the bound channel key type.
+channelInspector.payloadsFor("user-id")
 
 // @ts-expect-error The key must match the channel key type.
 instrumentedTestEventBus.payloadsFor(commentEvents, "user-id")

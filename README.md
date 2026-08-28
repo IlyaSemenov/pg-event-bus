@@ -301,4 +301,12 @@ The in-memory test bus:
 - Reports active subscriptions through `getActiveSubscriptionCount()`.
 - Completes all active streams when closed.
 
+When the application contract associates a key with a narrower payload subtype, bind the channel first and pass that subtype explicitly.
+
+```ts
+const createdEvents = testEventBus
+  .for(activityEvents)
+  .payloadsFor<CommentCreatedEvent>("created")
+```
+
 The factory calls `useEventBus()` when `send()`, `sendMany()`, or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.

@@ -12,6 +12,15 @@ export interface TestEventBusCall {
   payload: unknown
 }
 
+/** Test instrumentation bound to one typed event channel. */
+export interface TestEventChannelInspector<TPayload, TKey> {
+  /**
+   * Returns payloads recorded under `key`, optionally narrowed to a compatible subtype.
+   * An explicitly supplied subtype is trusted and is not validated at runtime.
+   */
+  payloadsFor<TEvent extends TPayload = TPayload>(key: TKey): readonly TEvent[]
+}
+
 /**
  * In-memory event bus with test instrumentation.
  *
@@ -25,6 +34,10 @@ export interface TestEventBus extends EventBus {
     channel: EventChannel<TPayload, TKey>,
     key: TKey,
   ): readonly TPayload[]
+  /** Returns test instrumentation bound to `channel`. */
+  for<TPayload, TKey>(
+    channel: EventChannel<TPayload, TKey>,
+  ): TestEventChannelInspector<TPayload, TKey>
   /** Clears the recorded calls without affecting active subscriptions. */
   clearCalls(): void
   /** Returns the number of active event subscriptions. */
@@ -95,6 +108,15 @@ export function createTestEventBus(): TestEventBus {
       .map((call) => call.payload as TPayload)
   }
 
+  function inspect<TPayload, TKey>(
+    channel: EventChannel<TPayload, TKey>,
+  ): TestEventChannelInspector<TPayload, TKey> {
+    return {
+      payloadsFor: <TEvent extends TPayload = TPayload>(key: TKey) =>
+        payloadsFor(channel, key) as readonly TEvent[],
+    }
+  }
+
   return {
     ready: Promise.resolve(),
     send,
@@ -103,6 +125,7 @@ export function createTestEventBus(): TestEventBus {
     close,
     calls,
     payloadsFor,
+    for: inspect,
     clearCalls() {
       calls.length = 0
     },

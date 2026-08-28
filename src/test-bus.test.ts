@@ -87,6 +87,10 @@ it("returns payload snapshots for a typed channel and key", async () => {
     { id: "first" },
     { id: "second" },
   ])
+  expect(eventBus.for(firstChannel).payloadsFor({ id: "one" })).toEqual([
+    { id: "first" },
+    { id: "second" },
+  ])
 })
 
 it("rejects channels not created by the channel factory", () => {
