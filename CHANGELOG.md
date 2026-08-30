@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.5.0
+
+### Minor Changes
+
+- c915575: Import `createTestEventBus` and its related types from `pg-event-bus/testing` instead of the package root.
+
 ## 3.4.0
 
 ### Minor Changes
