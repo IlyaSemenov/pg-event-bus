@@ -1,8 +1,12 @@
 import { EventEmitter } from "node:events"
 
+import type { PgEventBusOptions } from "./bus"
 import type { EventBus, EventBusEvent, EventChannel } from "./channel"
 import { resolveEventChannelName } from "./channel-name"
 import { streamEvents } from "./stream"
+
+/** Configuration for an in-memory test event bus. */
+export type TestEventBusOptions = Pick<PgEventBusOptions, "onDeliveryGap">
 
 /** One event sent through a test event bus. */
 export interface TestEventBusCall {
@@ -42,6 +46,8 @@ export interface TestEventBus extends EventBus {
   clearCalls(): void
   /** Returns the number of active event subscriptions. */
   getActiveSubscriptionCount(): number
+  /** Simulates a possible delivery gap after a PostgreSQL listener reconnects. */
+  simulateDeliveryGap(): void
 }
 
 /**
@@ -49,7 +55,9 @@ export interface TestEventBus extends EventBus {
  *
  * The bus supports consumer cancellation and closes all active streams when closed.
  */
-export function createTestEventBus(): TestEventBus {
+export function createTestEventBus(
+  options: TestEventBusOptions = {},
+): TestEventBus {
   const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
   const calls: TestEventBusCall[] = []
@@ -131,6 +139,15 @@ export function createTestEventBus(): TestEventBus {
     },
     getActiveSubscriptionCount() {
       return activeSubscriptionCount
+    },
+    simulateDeliveryGap() {
+      if (busAbort.signal.aborted) {
+        throw new Error(
+          "Cannot simulate a delivery gap after the test event bus is closed",
+        )
+      }
+
+      options.onDeliveryGap?.()
     },
   }
 }

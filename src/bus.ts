@@ -19,6 +19,8 @@ export interface PgEventBusOptions {
   channel: string
   /** Publishes encoded notifications through the application's current database connection. */
   publisher: PgEventPublisher
+  /** Runs after a disconnected listener has successfully started listening again. */
+  onDeliveryGap?: () => void
 }
 
 /**
@@ -30,6 +32,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   const listener = postgres(options.connectionString)
   const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
+  let hasListened = false
   let closed = false
 
   function fail(error: Error) {
@@ -53,10 +56,21 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   void ready.catch(() => {})
 
   async function initialize() {
-    await listener.listen(options.channel, receive)
+    await listener.listen(options.channel, receive, handleListen)
 
     if (closed) {
       await listener.end()
+    }
+  }
+
+  function handleListen() {
+    if (!hasListened) {
+      hasListened = true
+      return
+    }
+
+    if (!closed) {
+      options.onDeliveryGap?.()
     }
   }
 

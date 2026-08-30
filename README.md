@@ -205,6 +205,23 @@ Keep them small: PostgreSQL notification payloads must be shorter than 8000 byte
 
 PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
 
+### Recover from possible delivery gaps
+
+Pass `onDeliveryGap` when the application needs to restore derived state after a listener reconnect because notifications might have been lost while it was disconnected.
+The callback runs once after every repeated successful `LISTEN`, when the bus is ready to receive notifications again.
+It does not run after the initial `LISTEN` or during a normal `close()`.
+
+```ts
+const eventBus = createPgEventBus({
+  connectionString: databaseUrl,
+  channel: "my-app",
+  publisher,
+  onDeliveryGap() {
+    invalidateRealtimeViews()
+  },
+})
+```
+
 ## Dependency injection
 
 Skip this section if your application uses the concrete `eventBus` directly.
@@ -299,6 +316,7 @@ The in-memory test bus:
 - Delivers sends to active subscribers and honors their abort signals.
 - Clears only the recorded history with `clearCalls()`.
 - Reports active subscriptions through `getActiveSubscriptionCount()`.
+- Simulates a possible delivery gap after a listener reconnects through `simulateDeliveryGap()`.
 - Completes all active streams when closed.
 
 When the application contract associates a key with a narrower payload subtype, bind the channel first and pass that subtype explicitly.

@@ -138,6 +138,40 @@ it("keeps active streams subscribed after the listener reconnects", async () => 
   controller.abort()
 })
 
+it("reports a possible delivery gap after each successful reconnect", async () => {
+  const applicationName = `${postgresChannel}_gap_listener`
+  const gapConnectionString = `${connectionString}${querySeparator}application_name=${applicationName}`
+  let gapCount = 0
+  const gapBus = createPgEventBus({
+    connectionString: gapConnectionString,
+    channel: `${postgresChannel}_gap`,
+    publisher,
+    onDeliveryGap: () => gapCount++,
+  })
+
+  try {
+    await gapBus.ready
+    expect(gapCount).toBe(0)
+
+    let listenerPid = await waitForApplicationPid(applicationName)
+    await sql`SELECT pg_terminate_backend(${listenerPid})`
+    listenerPid = await waitForApplicationPid(applicationName, listenerPid)
+    await waitFor(() => gapCount === 1)
+
+    expect(gapCount).toBe(1)
+
+    await sql`SELECT pg_terminate_backend(${listenerPid})`
+    await waitForApplicationPid(applicationName, listenerPid)
+    await waitFor(() => gapCount === 2)
+
+    expect(gapCount).toBe(2)
+  } finally {
+    await gapBus.close()
+  }
+
+  expect(gapCount).toBe(2)
+})
+
 it("ignores malformed notifications without closing active streams", async () => {
   const events = createEventChannelFactory(bus)<TestEvent>(
     (key) => `malformed:${key}`,
@@ -200,13 +234,20 @@ async function withTimeout<T>(
 }
 
 async function waitForListenerPid(excludedPid?: number): Promise<number> {
+  return waitForApplicationPid(listenerApplicationName, excludedPid)
+}
+
+async function waitForApplicationPid(
+  applicationName: string,
+  excludedPid?: number,
+): Promise<number> {
   const deadline = Date.now() + 5_000
 
   while (Date.now() < deadline) {
     const result = await sql<{ pid: number }[]>`
       SELECT pid
       FROM pg_stat_activity
-      WHERE application_name = ${listenerApplicationName}
+      WHERE application_name = ${applicationName}
     `
     const pid = result[0]?.pid
 
@@ -218,4 +259,18 @@ async function waitForListenerPid(excludedPid?: number): Promise<number> {
   }
 
   throw new Error("PostgreSQL listener did not reconnect in time")
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5_000
+
+  while (Date.now() < deadline) {
+    if (condition()) {
+      return
+    }
+
+    await Bun.sleep(25)
+  }
+
+  throw new Error("Condition was not met in time")
 }

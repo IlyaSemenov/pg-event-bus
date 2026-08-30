@@ -23,6 +23,10 @@ interface SessionKey {
 
 const testEventBus: EventBus = createTestEventBus()
 const instrumentedTestEventBus = createTestEventBus()
+const deliveryGapTestEventBus = createTestEventBus({
+  onDeliveryGap() {},
+})
+deliveryGapTestEventBus.simulateDeliveryGap()
 const defineEventChannel = createEventChannelFactory(instrumentedTestEventBus)
 const commentEvents = defineEventChannel<CommentEvent, SessionKey>(
   (session) => `comment:${session.userId}:${session.scope}`,

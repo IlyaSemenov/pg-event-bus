@@ -61,6 +61,25 @@ it("records and delivers a batch in order", async () => {
   await eventBus.close()
 })
 
+it("simulates delivery gaps", async () => {
+  let deliveryGapCount = 0
+  const eventBus = createTestEventBus({
+    onDeliveryGap: () => deliveryGapCount++,
+  })
+
+  expect(deliveryGapCount).toBe(0)
+  eventBus.simulateDeliveryGap()
+  eventBus.simulateDeliveryGap()
+
+  expect(deliveryGapCount).toBe(2)
+
+  await eventBus.close()
+  expect(() => eventBus.simulateDeliveryGap()).toThrow(
+    "Cannot simulate a delivery gap after the test event bus is closed",
+  )
+  expect(deliveryGapCount).toBe(2)
+})
+
 it("returns payload snapshots for a typed channel and key", async () => {
   const eventBus = createTestEventBus()
   const defineEventChannel = createEventChannelFactory(eventBus)
