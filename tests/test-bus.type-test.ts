@@ -1,8 +1,5 @@
-import {
-  createEventChannelFactory,
-  createTestEventBus,
-  type EventBus,
-} from "pg-event-bus"
+import { createEventChannelFactory, type EventBus } from "pg-event-bus"
+import { createTestEventBus } from "pg-event-bus/testing"
 
 interface CommentCreatedEvent {
   type: "created"

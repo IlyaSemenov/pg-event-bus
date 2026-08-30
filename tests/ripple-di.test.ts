@@ -1,10 +1,7 @@
 import { expect, it } from "bun:test"
 
-import {
-  createEventChannelFactory,
-  createTestEventBus,
-  type EventBus,
-} from "pg-event-bus"
+import { createEventChannelFactory, type EventBus } from "pg-event-bus"
+import { createTestEventBus } from "pg-event-bus/testing"
 import { defineDependency, provide, withOverrides } from "ripple-di"
 
 interface CommentEvent {

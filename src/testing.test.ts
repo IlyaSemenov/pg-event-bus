@@ -1,7 +1,7 @@
 import { expect, it } from "bun:test"
 
 import { createEventChannelFactory } from "./channel"
-import { createTestEventBus } from "./test-bus"
+import { createTestEventBus } from "./testing"
 
 it("records and delivers events", async () => {
   const eventBus = createTestEventBus()

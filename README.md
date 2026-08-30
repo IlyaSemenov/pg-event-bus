@@ -273,7 +273,7 @@ export const commentEvents = defineEventChannel<CommentEvent>(
 Tests can replace the dependency without recreating domain channels that were declared when their modules loaded.
 
 ```ts
-import { createTestEventBus } from "pg-event-bus"
+import { createTestEventBus } from "pg-event-bus/testing"
 import { provide, withOverrides } from "ripple-di"
 
 const testEventBus = createTestEventBus()

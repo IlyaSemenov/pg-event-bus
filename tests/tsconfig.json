@@ -2,7 +2,8 @@
   "extends": "../tsconfig",
   "compilerOptions": {
     "paths": {
-      "pg-event-bus": ["../src"]
+      "pg-event-bus": ["../src"],
+      "pg-event-bus/testing": ["../src/testing.ts"]
     }
   },
   "include": ["**/*.ts"]
