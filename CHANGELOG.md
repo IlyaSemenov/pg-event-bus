@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.4.0
+
+### Minor Changes
+
+- 54a2ade: Add `onDeliveryGap` to report possible notification delivery gaps after the PostgreSQL listener reconnects.
+
 ## 3.3.0
 
 ### Minor Changes
