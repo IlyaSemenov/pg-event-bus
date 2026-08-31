@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 3.6.0
+
+### Minor Changes
+
+- 658a9f6: Add asynchronous disposal support to PostgreSQL and in-memory test event buses through `Symbol.asyncDispose`.
+
 ## 3.5.0
 
 ### Minor Changes
