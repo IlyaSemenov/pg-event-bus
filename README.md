@@ -167,6 +167,8 @@ Call `close()` during application shutdown to stop the PostgreSQL listener and c
 await eventBus.close()
 ```
 
+The PostgreSQL and in-memory test buses also implement the asynchronous disposal protocol, so integrations can use `Symbol.asyncDispose` instead of calling `close()` directly.
+
 ## Custom adapters
 
 An adapter that cannot execute the `{ text, values }` query produced by `createPublisher()` can use `createRawPublisher()` as an escape hatch.

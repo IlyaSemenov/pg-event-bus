@@ -201,7 +201,8 @@ it("completes active streams when the bus closes", async () => {
   const events = createEventChannelFactory(closingBus)<TestEvent>((key) => key)
   const stream = events.on("pending")
   const received = stream.next()
-  await closingBus.close()
+  expect(closingBus[Symbol.asyncDispose]).toBe(closingBus.close)
+  await closingBus[Symbol.asyncDispose]()
 
   expect(await received).toEqual({ value: undefined, done: true })
   await expect(

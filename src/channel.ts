@@ -43,7 +43,7 @@ export interface EventBusEvent {
  *
  * Implementations publish and consume fully built event names.
  */
-export interface EventBus {
+export interface EventBus extends AsyncDisposable {
   /** Resolves when the event bus is ready to receive events. */
   ready: Promise<void>
   /** Publishes a payload under a fully built event name. */

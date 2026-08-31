@@ -128,6 +128,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
     sendMany,
     on: onEvent,
     close,
+    [Symbol.asyncDispose]: close,
   }
 }
 

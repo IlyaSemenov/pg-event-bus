@@ -20,6 +20,7 @@ interface SessionKey {
 
 const testEventBus: EventBus = createTestEventBus()
 const instrumentedTestEventBus = createTestEventBus()
+const disposableTestEventBus: AsyncDisposable = instrumentedTestEventBus
 const deliveryGapTestEventBus = createTestEventBus({
   onDeliveryGap() {},
 })
@@ -35,6 +36,7 @@ const payloads: readonly CommentEvent[] = instrumentedTestEventBus.payloadsFor(
 )
 
 void payloads
+void disposableTestEventBus
 
 const channelInspector = instrumentedTestEventBus.for(commentEvents)
 const inferredPayloads: readonly CommentEvent[] = channelInspector.payloadsFor({

@@ -131,6 +131,7 @@ export function createTestEventBus(
     sendMany,
     on: onEvent,
     close,
+    [Symbol.asyncDispose]: close,
     calls,
     payloadsFor,
     for: inspect,

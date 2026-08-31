@@ -27,6 +27,7 @@ it("resolves the event bus lazily for dependency injection", async () => {
 
 function createTestEventBus() {
   const calls: Array<{ event: string; payload: unknown }> = []
+  const close = async () => {}
   const bus: EventBus = {
     ready: Promise.resolve(),
     async send(event, payload) {
@@ -36,7 +37,8 @@ function createTestEventBus() {
       calls.push(...events)
     },
     async *on() {},
-    async close() {},
+    close,
+    [Symbol.asyncDispose]: close,
   }
 
   return { bus, calls }

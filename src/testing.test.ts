@@ -22,7 +22,8 @@ it("records and delivers events", async () => {
   expect(eventBus.calls).toEqual([])
   expect(eventBus.getActiveSubscriptionCount()).toBe(1)
 
-  await eventBus.close()
+  expect(eventBus[Symbol.asyncDispose]).toBe(eventBus.close)
+  await eventBus[Symbol.asyncDispose]()
   expect(await stream.next()).toEqual({ value: undefined, done: true })
 })
 
