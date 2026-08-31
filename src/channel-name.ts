@@ -1,25 +1,24 @@
-import type { EventChannel } from "./channel"
+type EventChannelNameDefinition = string | ((key: never) => string)
 
-const eventNameBuilders = new WeakMap<object, (key: never) => string>()
+const eventNames = new WeakMap<object, EventChannelNameDefinition>()
 
-export function registerEventChannel<TPayload, TKey>(
-  channel: EventChannel<TPayload, TKey>,
-  buildName: (key: TKey) => string,
+export function registerEventChannel(
+  channel: object,
+  eventOrBuildName: EventChannelNameDefinition,
 ) {
-  eventNameBuilders.set(channel, buildName)
+  eventNames.set(channel, eventOrBuildName)
 }
 
-export function resolveEventChannelName<TPayload, TKey>(
-  channel: EventChannel<TPayload, TKey>,
-  key: TKey,
-) {
-  const buildName = eventNameBuilders.get(channel)
+export function resolveEventChannelName(channel: object, key?: unknown) {
+  const eventOrBuildName = eventNames.get(channel)
 
-  if (!buildName) {
+  if (eventOrBuildName === undefined) {
     throw new TypeError(
       "Expected an event channel created by createEventChannelFactory",
     )
   }
 
-  return buildName(key as never)
+  return typeof eventOrBuildName === "string"
+    ? eventOrBuildName
+    : eventOrBuildName(key as never)
 }

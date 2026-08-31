@@ -122,6 +122,46 @@ it("returns payload snapshots for a typed channel and key", async () => {
   ])
 })
 
+it("records, delivers, and inspects a fixed-name channel", async () => {
+  const eventBus = createTestEventBus()
+  const events = createEventChannelFactory(eventBus)<{ id: string }>(
+    "activity_log",
+  )
+  const stream = events.on()
+  const firstReceived = stream.next()
+
+  await events.send({ id: "first" })
+  expect(await firstReceived).toEqual({
+    value: { id: "first" },
+    done: false,
+  })
+
+  const secondReceived = stream.next()
+  const thirdReceived = stream.next()
+  await events.sendMany([{ id: "second" }, { id: "third" }])
+
+  expect(await secondReceived).toEqual({
+    value: { id: "second" },
+    done: false,
+  })
+  expect(await thirdReceived).toEqual({
+    value: { id: "third" },
+    done: false,
+  })
+  expect(eventBus.payloadsFor(events)).toEqual([
+    { id: "first" },
+    { id: "second" },
+    { id: "third" },
+  ])
+  expect(eventBus.for(events).payloadsFor()).toEqual([
+    { id: "first" },
+    { id: "second" },
+    { id: "third" },
+  ])
+
+  await eventBus.close()
+})
+
 it("rejects channels not created by the channel factory", () => {
   const eventBus = createTestEventBus()
 

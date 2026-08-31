@@ -1,7 +1,23 @@
 import { registerEventChannel } from "./channel-name"
 
-/** One typed event passed to an {@link EventChannel} batch. */
-export interface EventChannelEvent<TPayload, TKey = string> {
+/**
+ * Typed handle for one domain event with a fixed transport name.
+ *
+ * Every operation uses the same event name, so the application does not supply a key.
+ */
+export interface EventChannel<TPayload> {
+  /** Publishes one payload. */
+  send(payload: TPayload): Promise<void>
+  /** Publishes several payloads as one transport batch. */
+  sendMany(payloads: readonly TPayload[]): Promise<void>
+  /** Streams payloads until the signal aborts. */
+  on<TEvent extends TPayload = TPayload>(
+    signal?: AbortSignal,
+  ): AsyncGenerator<TEvent, void, unknown>
+}
+
+/** One typed event passed to a {@link KeyedEventChannel} batch. */
+export interface KeyedEventChannelEvent<TPayload, TKey = string> {
   /** Key used to build the concrete event name. */
   key: TKey
   /** Payload published under the built event name. */
@@ -13,11 +29,13 @@ export interface EventChannelEvent<TPayload, TKey = string> {
  *
  * A key selects the concrete event name, while every event in the channel shares one payload type.
  */
-export interface EventChannel<TPayload, TKey = string> {
+export interface KeyedEventChannel<TPayload, TKey = string> {
   /** Publishes a payload under the event name built from `key`. */
   send(key: TKey, payload: TPayload): Promise<void>
   /** Publishes several typed events as one transport batch. */
-  sendMany(events: readonly EventChannelEvent<TPayload, TKey>[]): Promise<void>
+  sendMany(
+    events: readonly KeyedEventChannelEvent<TPayload, TKey>[],
+  ): Promise<void>
   /**
    * Streams payloads published under the event name built from `key` until the signal aborts.
    *
@@ -62,13 +80,20 @@ export interface EventBus extends AsyncDisposable {
 }
 
 /**
- * Defines a typed event channel from a function that maps its key to an event name.
- *
- * Event keys are strings unless a different `TKey` is supplied.
+ * Defines a typed event channel with either a fixed event name or a function that maps keys to event names.
  */
-export type DefineEventChannel = <TPayload, TKey = string>(
-  buildName: (key: TKey) => string,
-) => EventChannel<TPayload, TKey>
+export interface DefineEventChannel {
+  /** Defines a channel whose operations always use the supplied event name. */
+  <TPayload>(event: string): EventChannel<TPayload>
+  /**
+   * Defines a family of events whose key is mapped to a concrete event name.
+   *
+   * Event keys are strings unless a different `TKey` is supplied.
+   */
+  <TPayload, TKey = string>(
+    buildName: (key: TKey) => string,
+  ): KeyedEventChannel<TPayload, TKey>
+}
 
 /**
  * Creates a channel factory bound to one event bus.
@@ -94,28 +119,53 @@ export function createEventChannelFactory(
       ? eventBusOrResolver
       : () => eventBusOrResolver
 
-  const defineEventChannel: DefineEventChannel = <TPayload, TKey = string>(
+  function defineEventChannel<TPayload>(event: string): EventChannel<TPayload>
+  function defineEventChannel<TPayload, TKey = string>(
     buildName: (key: TKey) => string,
-  ) => {
-    const channel: EventChannel<TPayload, TKey> = {
-      send: (key, payload) => getEventBus().send(buildName(key), payload),
-      sendMany: (events) =>
-        getEventBus().sendMany(
-          events.map(({ key, payload }) => ({
-            event: buildName(key),
-            payload,
-          })),
-        ),
-      on: <TEvent extends TPayload = TPayload>(
-        key: TKey,
-        signal?: AbortSignal,
-      ) => getEventBus().on<TEvent>(buildName(key), signal),
-    }
+  ): KeyedEventChannel<TPayload, TKey>
+  function defineEventChannel<TPayload, TKey = string>(
+    eventOrBuildName: string | ((key: TKey) => string),
+  ): EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey> {
+    const channel =
+      typeof eventOrBuildName === "string"
+        ? createEventChannel<TPayload>(getEventBus, eventOrBuildName)
+        : createKeyedEventChannel<TPayload, TKey>(getEventBus, eventOrBuildName)
 
-    registerEventChannel(channel, buildName)
+    registerEventChannel(channel, eventOrBuildName)
 
     return channel
   }
 
   return defineEventChannel
+}
+
+function createEventChannel<TPayload>(
+  getEventBus: () => EventBus,
+  event: string,
+): EventChannel<TPayload> {
+  return {
+    send: (payload) => getEventBus().send(event, payload),
+    sendMany: (payloads) =>
+      getEventBus().sendMany(payloads.map((payload) => ({ event, payload }))),
+    on: <TEvent extends TPayload = TPayload>(signal?: AbortSignal) =>
+      getEventBus().on<TEvent>(event, signal),
+  }
+}
+
+function createKeyedEventChannel<TPayload, TKey>(
+  getEventBus: () => EventBus,
+  buildName: (key: TKey) => string,
+): KeyedEventChannel<TPayload, TKey> {
+  return {
+    send: (key, payload) => getEventBus().send(buildName(key), payload),
+    sendMany: (events) =>
+      getEventBus().sendMany(
+        events.map(({ key, payload }) => ({
+          event: buildName(key),
+          payload,
+        })),
+      ),
+    on: <TEvent extends TPayload = TPayload>(key: TKey, signal?: AbortSignal) =>
+      getEventBus().on<TEvent>(buildName(key), signal),
+  }
 }

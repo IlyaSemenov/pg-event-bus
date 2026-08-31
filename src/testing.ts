@@ -1,6 +1,11 @@
 import { EventEmitter } from "node:events"
 
-import type { EventBus, EventBusEvent, EventChannel } from "./channel"
+import type {
+  EventBus,
+  EventBusEvent,
+  EventChannel,
+  KeyedEventChannel,
+} from "./channel"
 import { resolveEventChannelName } from "./channel-name"
 import { createDeliveryGaps } from "./gaps"
 import { streamEvents } from "./stream"
@@ -13,8 +18,17 @@ export interface TestEventBusCall {
   payload: unknown
 }
 
-/** Test instrumentation bound to one typed event channel. */
-export interface TestEventChannelInspector<TPayload, TKey> {
+/** Test instrumentation bound to one typed event channel with a fixed event name. */
+export interface TestEventChannelInspector<TPayload> {
+  /**
+   * Returns recorded payloads, optionally narrowed to a compatible subtype.
+   * An explicitly supplied subtype is trusted and is not validated at runtime.
+   */
+  payloadsFor<TEvent extends TPayload = TPayload>(): readonly TEvent[]
+}
+
+/** Test instrumentation bound to one typed keyed event channel. */
+export interface TestKeyedEventChannelInspector<TPayload, TKey> {
   /**
    * Returns payloads recorded under `key`, optionally narrowed to a compatible subtype.
    * An explicitly supplied subtype is trusted and is not validated at runtime.
@@ -30,15 +44,21 @@ export interface TestEventChannelInspector<TPayload, TKey> {
 export interface TestEventBus extends EventBus {
   /** Successful sends recorded in call order. */
   readonly calls: readonly TestEventBusCall[]
+  /** Returns a snapshot of payloads sent to a fixed-name channel created by {@link createEventChannelFactory}. */
+  payloadsFor<TPayload>(channel: EventChannel<TPayload>): readonly TPayload[]
   /** Returns a snapshot of payloads sent to a channel created by {@link createEventChannelFactory} under `key`. */
   payloadsFor<TPayload, TKey>(
-    channel: EventChannel<TPayload, TKey>,
+    channel: KeyedEventChannel<TPayload, TKey>,
     key: TKey,
   ): readonly TPayload[]
+  /** Returns test instrumentation bound to a fixed-name `channel`. */
+  for<TPayload>(
+    channel: EventChannel<TPayload>,
+  ): TestEventChannelInspector<TPayload>
   /** Returns test instrumentation bound to `channel`. */
   for<TPayload, TKey>(
-    channel: EventChannel<TPayload, TKey>,
-  ): TestEventChannelInspector<TPayload, TKey>
+    channel: KeyedEventChannel<TPayload, TKey>,
+  ): TestKeyedEventChannelInspector<TPayload, TKey>
   /** Clears the recorded calls without affecting active subscriptions. */
   clearCalls(): void
   /** Returns the number of active event subscriptions. */
@@ -101,10 +121,7 @@ export function createTestEventBus(): TestEventBus {
     busAbort.abort()
   }
 
-  function payloadsFor<TPayload, TKey>(
-    channel: EventChannel<TPayload, TKey>,
-    key: TKey,
-  ): readonly TPayload[] {
+  function recordedPayloadsFor<TPayload>(channel: object, key?: unknown) {
     const event = resolveEventChannelName(channel, key)
 
     return calls
@@ -112,13 +129,37 @@ export function createTestEventBus(): TestEventBus {
       .map((call) => call.payload as TPayload)
   }
 
+  function payloadsFor<TPayload>(
+    channel: EventChannel<TPayload>,
+  ): readonly TPayload[]
+  function payloadsFor<TPayload, TKey>(
+    channel: KeyedEventChannel<TPayload, TKey>,
+    key: TKey,
+  ): readonly TPayload[]
+  function payloadsFor<TPayload, TKey>(
+    channel: EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey>,
+    key?: TKey,
+  ): readonly TPayload[] {
+    return recordedPayloadsFor<TPayload>(channel, key)
+  }
+
+  function inspect<TPayload>(
+    channel: EventChannel<TPayload>,
+  ): TestEventChannelInspector<TPayload>
   function inspect<TPayload, TKey>(
-    channel: EventChannel<TPayload, TKey>,
-  ): TestEventChannelInspector<TPayload, TKey> {
-    return {
-      payloadsFor: <TEvent extends TPayload = TPayload>(key: TKey) =>
-        payloadsFor(channel, key) as readonly TEvent[],
+    channel: KeyedEventChannel<TPayload, TKey>,
+  ): TestKeyedEventChannelInspector<TPayload, TKey>
+  function inspect<TPayload, TKey>(
+    channel: EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey>,
+  ):
+    | TestEventChannelInspector<TPayload>
+    | TestKeyedEventChannelInspector<TPayload, TKey> {
+    const inspector = {
+      payloadsFor: <TEvent extends TPayload = TPayload>(key?: TKey) =>
+        recordedPayloadsFor<TEvent>(channel, key),
     }
+
+    return inspector
   }
 
   return {

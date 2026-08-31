@@ -17,7 +17,7 @@ npm install pg-event-bus
 
 ## Create a bus
 
-Pass a `connectionString` for the package's own listener connection, the PostgreSQL notification channel of your application, and a `publisher` that sends a notification batch through your database client or ORM in one call.
+Create the bus with a `connectionString` for its listener connection, the PostgreSQL notification channel of your application, and a `publisher` that sends a notification batch through your database client or ORM in one call.
 
 ```ts
 import { createPgEventBus, createPublisher } from "pg-event-bus"
@@ -34,7 +34,7 @@ const eventBus = createPgEventBus({
 ```
 
 Use one channel name per application, such as the application's own name.
-Every process of that application must pass the same name, and a different application sharing the database must pass another one.
+Every process of that application must use the same name, and a different application sharing the database must use another one.
 
 `createPublisher()` passes its callback a parameterized `pg_notify` query as `{ text, values }`, which the callback executes through the application's current database connection.
 If your database client uses a different query API, build a custom adapter with [createRawPublisher()](#custom-adapters).
@@ -43,12 +43,11 @@ Creating a bus immediately starts its dedicated listener, which executes `LISTEN
 
 ## Define an event channel
 
-An event channel is a typed layer above the bus.
-It maps an application key to an event name, and all its events share one payload type.
+An event channel is a typed event stream that application code can publish to and subscribe to.
+Each channel has a name and a payload type.
+All event channels defined for a bus travel through its single PostgreSQL notification channel.
 
-Define as many event channels on a bus as you need; they all travel through the single PostgreSQL channel of their bus.
-
-Create a channel factory bound to the bus:
+First create a channel factory for the bus:
 
 ```ts
 import { createEventChannelFactory } from "pg-event-bus"
@@ -56,7 +55,22 @@ import { createEventChannelFactory } from "pg-event-bus"
 const defineEventChannel = createEventChannelFactory(eventBus)
 ```
 
-The following channel uses a post ID as its key and accepts one payload type.
+Define a channel with its name and payload type:
+
+```ts
+interface LogEvent {
+  message: string
+}
+
+export const logEvents = defineEventChannel<LogEvent>("log")
+```
+
+`logEvents` keeps the `"log"` name and the `LogEvent` payload contract together, so the rest of the application uses the channel without repeating either one.
+
+A keyed event channel is a family of related subchannels that share one payload type.
+For example, every post can have its own comment event stream while all comment events share one payload type.
+
+Define such a keyed channel with a function that maps each key to the name used by the bus:
 
 ```ts
 interface CommentEvent {
@@ -69,8 +83,10 @@ export const commentEvents = defineEventChannel<CommentEvent>(
 )
 ```
 
+`commentEvents` represents the whole family, and a post ID selects one subchannel when the application publishes or subscribes.
+
 Event keys are strings by default.
-Pass a second generic argument only when a channel uses another key type.
+Supply the second generic argument when a channel uses another key type.
 
 ```ts
 defineEventChannel<ChatEvent, SessionKey>(
@@ -80,18 +96,42 @@ defineEventChannel<ChatEvent, SessionKey>(
 
 ## Send and receive events
 
-Call `send()` to publish an event.
+Publish one payload with `send()`:
+
+```ts
+await logEvents.send({
+  message: "Comment created",
+})
+```
+
+Publish several payloads in one database call with `sendMany()`:
+
+```ts
+await logEvents.sendMany([
+  { message: "First comment created" },
+  { message: "Second comment created" },
+])
+```
+
+Subscribe with `on()`, which returns an `AsyncIterable` of channel payloads:
+
+```ts
+for await (const event of logEvents.on(signal)) {
+  console.log(event.message)
+}
+```
+
+Use an `AbortSignal` to stop the subscription when its consumer disconnects.
+
+For a keyed channel, `send()` and `on()` take the key of the selected subchannel.
+Every `sendMany()` item carries its own key because one batch can target several subchannels.
 
 ```ts
 await commentEvents.send(postId, {
   eventType: "created",
   commentId,
 })
-```
 
-Call `sendMany()` to publish several events in one database call.
-
-```ts
 await commentEvents.sendMany(
   comments.map(comment => ({
     key: comment.postId,
@@ -101,19 +141,13 @@ await commentEvents.sendMany(
     },
   })),
 )
-```
 
-Call `on()` to consume matching events as an `AsyncIterable`.
-
-```ts
 for await (const event of commentEvents.on(postId, signal)) {
   console.log(event.commentId)
 }
 ```
 
-Pass an `AbortSignal` to stop the stream when its consumer disconnects.
-
-When a channel has a union payload and the application contract associates a key with one of its subtypes, pass that subtype explicitly to `on()`.
+When a keyed channel has a union payload and the application contract associates a key with one of its subtypes, supply that subtype explicitly to `on()`.
 
 ```ts
 type ActivityEvent = CommentCreatedEvent | CommentDeletedEvent
@@ -262,14 +296,16 @@ Domain modules import the shared factory instead of the concrete PostgreSQL bus.
 ```ts
 import { defineEventChannel } from "#events"
 
+export const logEvents = defineEventChannel<LogEvent>("log")
+
 export const commentEvents = defineEventChannel<CommentEvent>(
   postId => `post:${postId}:comment`,
 )
 ```
 
-### Test override
+### Testing with TestEventBus
 
-Tests can replace the dependency without recreating domain channels that were declared when their modules loaded.
+Create an in-memory event bus and provide it as the dependency override for each test.
 
 ```ts
 import { createTestEventBus } from "pg-event-bus/testing"
@@ -278,7 +314,28 @@ import { provide, withOverrides } from "ripple-di"
 const testEventBus = createTestEventBus()
 
 afterEach(() => testEventBus.clearCalls())
+```
 
+Run the operation inside `withOverrides()` to provide the test bus.
+The channel factory resolves `useEventBus()` when `send()` runs, so `logEvents`, although declared earlier, uses the active override.
+After the operation, pass `logEvents` to `payloadsFor()` to inspect its recorded payloads; no separate channel name is required.
+
+```ts
+test("publishes a log event through the override", async () => {
+  await withOverrides(
+    provide(useEventBus, testEventBus),
+    () => logEvents.send({ message: "Comment created" }),
+  )
+
+  expect(testEventBus.payloadsFor(logEvents)).toEqual([
+    { message: "Comment created" },
+  ])
+})
+```
+
+For a keyed channel, `payloadsFor()` additionally takes the selected subchannel key.
+
+```ts
 test("publishes a comment event through the override", async () => {
   await withOverrides(
     provide(useEventBus, testEventBus),
@@ -287,16 +344,6 @@ test("publishes a comment event through the override", async () => {
       commentId: "comment-id",
     }),
   )
-
-  expect(testEventBus.calls).toEqual([
-    {
-      event: "post:post-id:comment",
-      payload: {
-        eventType: "created",
-        commentId: "comment-id",
-      },
-    },
-  ])
 
   expect(testEventBus.payloadsFor(commentEvents, "post-id")).toEqual([
     {
@@ -307,19 +354,10 @@ test("publishes a comment event through the override", async () => {
 })
 ```
 
-The in-memory test bus:
-
-- Records successful individual and batch sends in `calls`.
-- Returns typed payload snapshots for a channel and key through `payloadsFor()`.
-- Resolves `ready` immediately.
-- Delivers sends to active subscribers and honors their abort signals.
-- Clears only the recorded history with `clearCalls()`.
-- Reports active subscriptions through `getActiveSubscriptionCount()`.
-- Simulates a possible delivery gap after a listener reconnects through `simulateDeliveryGap()`.
-- Exposes those simulated delivery gaps through the same `deliveryGaps()` stream as the production bus.
-- Completes all active streams when closed.
-
-When the application contract associates a key with a narrower payload subtype, bind the channel first and pass that subtype explicitly.
+`payloadsFor()` normally returns the channel's full payload type.
+When a particular key represents only one member of a union payload, a test may need a narrower result type.
+Bind the channel with `for()`, then supply the expected subtype to `payloadsFor()`.
+This two-step form keeps the channel payload and key types inferred while checking that the requested subtype belongs to the channel payload.
 
 ```ts
 const createdEvents = testEventBus
@@ -327,4 +365,10 @@ const createdEvents = testEventBus
   .payloadsFor<CommentCreatedEvent>("created")
 ```
 
-The factory calls `useEventBus()` when `send()`, `sendMany()`, or `on()` runs, not when `commentEvents` is declared, so the operation uses the scoped test binding.
+The in-memory test bus also:
+
+- Records successful individual and batch sends in `calls`, while `clearCalls()` clears only that history.
+- Resolves `ready` immediately.
+- Delivers sends to active subscribers, honors their abort signals, and reports their count through `getActiveSubscriptionCount()`.
+- Produces delivery gap signals through `simulateDeliveryGap()` and `deliveryGaps()`.
+- Completes all active streams when closed.

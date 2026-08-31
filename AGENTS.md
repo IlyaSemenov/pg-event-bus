@@ -34,7 +34,8 @@ Consumer failures must not affect listener reconnection or other delivery gap st
 When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()`, `sendMany()`, or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
 When it receives an `EventBus` directly, channels remain bound to that instance.
-Keep each channel's event-name resolver in library-private metadata so test instrumentation can resolve logical channel keys without exposing transport names.
+String definitions create event channels with one fixed event name, while function definitions create keyed event channels.
+Keep each channel's fixed event name or event-name resolver in library-private metadata so test instrumentation can resolve channels without reconstructing transport names.
 
 ## Documentation
 

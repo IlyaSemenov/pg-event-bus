@@ -25,8 +25,41 @@ it("resolves the event bus lazily for dependency injection", async () => {
   ])
 })
 
+it("uses a fixed event name and resolves the event bus for every operation", async () => {
+  const test = createTestEventBus()
+  let resolverCalls = 0
+  const defineEventChannel = createEventChannelFactory(() => {
+    resolverCalls += 1
+    return test.bus
+  })
+  const events = defineEventChannel<{ id: string }>("activity_log")
+  const controller = new AbortController()
+
+  await events.send({ id: "first" })
+  await events.sendMany([{ id: "second" }, { id: "third" }])
+  await events.on(controller.signal).next()
+
+  expect(resolverCalls).toBe(3)
+  expect(test.calls).toEqual([
+    { event: "activity_log", payload: { id: "first" } },
+    { event: "activity_log", payload: { id: "second" } },
+    { event: "activity_log", payload: { id: "third" } },
+  ])
+  expect(test.batches).toEqual([
+    [
+      { event: "activity_log", payload: { id: "second" } },
+      { event: "activity_log", payload: { id: "third" } },
+    ],
+  ])
+  expect(test.subscriptions).toEqual([
+    { event: "activity_log", signal: controller.signal },
+  ])
+})
+
 function createTestEventBus() {
   const calls: Array<{ event: string; payload: unknown }> = []
+  const batches: Array<readonly { event: string; payload: unknown }[]> = []
+  const subscriptions: Array<{ event: string; signal?: AbortSignal }> = []
   const close = async () => {}
   const bus: EventBus = {
     ready: Promise.resolve(),
@@ -34,13 +67,17 @@ function createTestEventBus() {
       calls.push({ event, payload })
     },
     async sendMany(events) {
+      batches.push(events)
       calls.push(...events)
     },
-    async *on() {},
+    async *on<TPayload>(event: string, signal?: AbortSignal) {
+      subscriptions.push({ event, signal })
+      yield* [] as TPayload[]
+    },
     async *deliveryGaps() {},
     close,
     [Symbol.asyncDispose]: close,
   }
 
-  return { bus, calls }
+  return { bus, calls, batches, subscriptions }
 }

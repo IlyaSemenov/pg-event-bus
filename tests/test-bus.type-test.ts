@@ -26,6 +26,7 @@ const deliveryGapStream: AsyncGenerator<void, void, unknown> =
   deliveryGapTestEventBus.deliveryGaps(new AbortController().signal)
 deliveryGapTestEventBus.simulateDeliveryGap()
 const defineEventChannel = createEventChannelFactory(instrumentedTestEventBus)
+const auditEvents = defineEventChannel<CommentEvent>("audit")
 const commentEvents = defineEventChannel<CommentEvent, SessionKey>(
   (session) => `comment:${session.userId}:${session.scope}`,
 )
@@ -35,7 +36,18 @@ const payloads: readonly CommentEvent[] = instrumentedTestEventBus.payloadsFor(
   { userId: "user-id", scope: "support" },
 )
 
+const auditPayloads: readonly CommentEvent[] =
+  instrumentedTestEventBus.payloadsFor(auditEvents)
+const auditInspector = instrumentedTestEventBus.for(auditEvents)
+const inspectedAuditPayloads: readonly CommentEvent[] =
+  auditInspector.payloadsFor()
+const narrowedAuditPayloads: readonly CommentCreatedEvent[] =
+  auditInspector.payloadsFor<CommentCreatedEvent>()
+
 void payloads
+void auditPayloads
+void inspectedAuditPayloads
+void narrowedAuditPayloads
 void testEventBus
 void disposableTestEventBus
 void deliveryGapStream
@@ -62,6 +74,18 @@ channelInspector.payloadsFor<{ type: "unrelated" }>({
 
 // @ts-expect-error The key must match the bound channel key type.
 channelInspector.payloadsFor("user-id")
+
+// @ts-expect-error Fixed-name channel instrumentation does not accept a key.
+auditInspector.payloadsFor("audit")
+
+// @ts-expect-error Fixed-name channel instrumentation does not accept a key.
+instrumentedTestEventBus.payloadsFor(auditEvents, "audit")
+
+// @ts-expect-error Keyed channel instrumentation requires a key.
+channelInspector.payloadsFor()
+
+// @ts-expect-error Keyed channel instrumentation requires a key.
+instrumentedTestEventBus.payloadsFor(commentEvents)
 
 // @ts-expect-error The key must match the channel key type.
 instrumentedTestEventBus.payloadsFor(commentEvents, "user-id")
