@@ -1,5 +1,12 @@
 # pg-event-bus
 
+## 4.0.0
+
+### Major Changes
+
+- 5ec5b4b: Replace the single `onDeliveryGap` callback with `deliveryGaps()` stream.
+  Publish `pg-event-bus` as ESM-only.
+
 ## 3.6.0
 
 ### Minor Changes
