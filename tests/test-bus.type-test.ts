@@ -21,9 +21,9 @@ interface SessionKey {
 const testEventBus: EventBus = createTestEventBus()
 const instrumentedTestEventBus = createTestEventBus()
 const disposableTestEventBus: AsyncDisposable = instrumentedTestEventBus
-const deliveryGapTestEventBus = createTestEventBus({
-  onDeliveryGap() {},
-})
+const deliveryGapTestEventBus = createTestEventBus()
+const deliveryGapStream: AsyncGenerator<void, void, unknown> =
+  deliveryGapTestEventBus.deliveryGaps(new AbortController().signal)
 deliveryGapTestEventBus.simulateDeliveryGap()
 const defineEventChannel = createEventChannelFactory(instrumentedTestEventBus)
 const commentEvents = defineEventChannel<CommentEvent, SessionKey>(
@@ -36,7 +36,9 @@ const payloads: readonly CommentEvent[] = instrumentedTestEventBus.payloadsFor(
 )
 
 void payloads
+void testEventBus
 void disposableTestEventBus
+void deliveryGapStream
 
 const channelInspector = instrumentedTestEventBus.for(commentEvents)
 const inferredPayloads: readonly CommentEvent[] = channelInspector.payloadsFor({

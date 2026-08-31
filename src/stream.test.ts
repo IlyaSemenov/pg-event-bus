@@ -60,3 +60,73 @@ it("fails active streams when the event bus fails", async () => {
 
   await expect(received).rejects.toBe(expected)
 })
+
+it("completes for an already aborted consumer signal", async () => {
+  const eventEmitter = new EventEmitter()
+  const busAbort = new AbortController()
+  const consumerAbort = new AbortController()
+  consumerAbort.abort()
+
+  const stream = streamEvents(
+    eventEmitter,
+    "event",
+    busAbort.signal,
+    consumerAbort.signal,
+  )
+
+  expect(await stream.next()).toEqual({ value: undefined, done: true })
+})
+
+it("treats a custom consumer abort reason as cancellation", async () => {
+  const eventEmitter = new EventEmitter()
+  const busAbort = new AbortController()
+  const consumerAbort = new AbortController()
+  const stream = streamEvents(
+    eventEmitter,
+    "event",
+    busAbort.signal,
+    consumerAbort.signal,
+  )
+  const received = stream.next()
+
+  consumerAbort.abort(new Error("consumer stopped"))
+
+  expect(await received).toEqual({ value: undefined, done: true })
+})
+
+it("honors consumer cancellation before a bus failure", async () => {
+  const eventEmitter = new EventEmitter()
+  const busAbort = new AbortController()
+  const consumerAbort = new AbortController()
+  const stream = streamEvents(
+    eventEmitter,
+    "event",
+    busAbort.signal,
+    consumerAbort.signal,
+  )
+  const received = stream.next()
+
+  consumerAbort.abort()
+  busAbort.abort(new Error("listener failed"))
+
+  expect(await received).toEqual({ value: undefined, done: true })
+})
+
+it("reports a bus failure before consumer cancellation", async () => {
+  const eventEmitter = new EventEmitter()
+  const busAbort = new AbortController()
+  const consumerAbort = new AbortController()
+  const expected = new Error("listener failed")
+  const stream = streamEvents(
+    eventEmitter,
+    "event",
+    busAbort.signal,
+    consumerAbort.signal,
+  )
+  const received = stream.next()
+
+  busAbort.abort(expected)
+  consumerAbort.abort()
+
+  await expect(received).rejects.toBe(expected)
+})

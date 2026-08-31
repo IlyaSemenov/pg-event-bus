@@ -17,26 +17,11 @@
   "homepage": "https://github.com/IlyaSemenov/pg-event-bus#readme",
   "bugs": "https://github.com/IlyaSemenov/pg-event-bus/issues",
   "exports": {
-    ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
-    },
-    "./testing": {
-      "import": "./dist/testing.mjs",
-      "require": "./dist/testing.cjs"
-    },
+    ".": "./dist/index.mjs",
+    "./testing": "./dist/testing.mjs",
     "./package.json": "./package.json"
   },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.cts",
-  "typesVersions": {
-    "*": {
-      "testing": [
-        "./dist/testing.d.cts"
-      ]
-    }
-  },
+  "types": "./dist/index.d.mts",
   "files": [
     "README.md",
     "dist"

@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events"
 import postgres from "postgres"
 
 import type { EventBus, EventBusEvent } from "./channel"
+import { createDeliveryGaps } from "./gaps"
 import { decodeEventMessage, encodeEventMessage } from "./message"
 import type { PgEventPublisher } from "./publisher"
 import { streamEvents } from "./stream"
@@ -19,8 +20,6 @@ export interface PgEventBusOptions {
   channel: string
   /** Publishes encoded notifications through the application's current database connection. */
   publisher: PgEventPublisher
-  /** Runs after a disconnected listener has successfully started listening again. */
-  onDeliveryGap?: () => void
 }
 
 /**
@@ -32,6 +31,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   const listener = postgres(options.connectionString)
   const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
+  const deliveryGaps = createDeliveryGaps(busAbort.signal)
   let hasListened = false
   let closed = false
 
@@ -70,7 +70,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
     }
 
     if (!closed) {
-      options.onDeliveryGap?.()
+      void deliveryGaps.emit()
     }
   }
 
@@ -127,6 +127,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
     send,
     sendMany,
     on: onEvent,
+    deliveryGaps: deliveryGaps.stream,
     close,
     [Symbol.asyncDispose]: close,
   }

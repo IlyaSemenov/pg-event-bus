@@ -37,6 +37,7 @@ function createTestEventBus() {
       calls.push(...events)
     },
     async *on() {},
+    async *deliveryGaps() {},
     close,
     [Symbol.asyncDispose]: close,
   }

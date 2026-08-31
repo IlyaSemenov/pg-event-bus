@@ -16,6 +16,7 @@ Do not catalog files or restate information evident from their names and locatio
 - Keep integration, package-boundary, and type-inference tests in `tests/`.
 - Keep `src/index.ts` as a barrel that exports only public modules.
 - Treat `package.json` exports and supported runtimes as public contracts.
+- Publish ESM output only.
 
 ## Architecture
 
@@ -25,6 +26,10 @@ Postgres.js manages the listener connection and reconnection lifecycle.
 The package is ORM-agnostic and contains no ORM-specific adapters.
 `createPublisher` builds one parameterized `pg_notify` query and delegates its execution to the application's current database connection.
 `createRawPublisher` delegates the readonly notification array instead, including when `send()` publishes one event.
+
+Each `deliveryGaps()` call creates an independent stream that receives a signal after every successful listener reconnection, but not after the initial `LISTEN`.
+Delivery gap streams honor their consumer abort signal and complete when the bus closes.
+Consumer failures must not affect listener reconnection or other delivery gap streams.
 
 When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()`, `sendMany()`, or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.

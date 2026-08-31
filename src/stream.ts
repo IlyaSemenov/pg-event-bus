@@ -2,7 +2,7 @@ import { type EventEmitter, on } from "node:events"
 
 export async function* streamEvents<TPayload>(
   eventEmitter: EventEmitter,
-  event: string,
+  event: string | symbol,
   busSignal: AbortSignal,
   userSignal?: AbortSignal,
 ): AsyncGenerator<TPayload, void, unknown> {
@@ -15,7 +15,11 @@ export async function* streamEvents<TPayload>(
       yield payload as TPayload
     }
   } catch (error) {
-    if (busSignal.aborted && !isAbortError(busSignal.reason)) {
+    if (
+      busSignal.aborted &&
+      signal.reason === busSignal.reason &&
+      !isAbortError(busSignal.reason)
+    ) {
       throw busSignal.reason
     }
 

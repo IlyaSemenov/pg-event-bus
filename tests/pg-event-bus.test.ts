@@ -141,35 +141,52 @@ it("keeps active streams subscribed after the listener reconnects", async () => 
 it("reports a possible delivery gap after each successful reconnect", async () => {
   const applicationName = `${postgresChannel}_gap_listener`
   const gapConnectionString = `${connectionString}${querySeparator}application_name=${applicationName}`
-  let gapCount = 0
   const gapBus = createPgEventBus({
     connectionString: gapConnectionString,
     channel: `${postgresChannel}_gap`,
     publisher,
-    onDeliveryGap: () => gapCount++,
   })
+  const expectedConsumerError = new Error("delivery gap consumer failed")
+  const failingConsumer = (async () => {
+    for await (const deliveryGap of gapBus.deliveryGaps()) {
+      void deliveryGap
+      throw expectedConsumerError
+    }
+  })()
+  const failingConsumerError = failingConsumer.catch((error: unknown) => error)
+  const survivingStream = gapBus.deliveryGaps()
+  const firstSurvivingGap = survivingStream.next()
 
   try {
     await gapBus.ready
-    expect(gapCount).toBe(0)
+    expect(await settlesWithin(firstSurvivingGap, 75)).toBe(false)
 
     let listenerPid = await waitForApplicationPid(applicationName)
     await sql`SELECT pg_terminate_backend(${listenerPid})`
     listenerPid = await waitForApplicationPid(applicationName, listenerPid)
-    await waitFor(() => gapCount === 1)
 
-    expect(gapCount).toBe(1)
+    expect(await failingConsumerError).toBe(expectedConsumerError)
+    expect(await withTimeout(firstSurvivingGap, 5_000)).toEqual({
+      value: undefined,
+      done: false,
+    })
 
+    const secondSurvivingGap = survivingStream.next()
     await sql`SELECT pg_terminate_backend(${listenerPid})`
     await waitForApplicationPid(applicationName, listenerPid)
-    await waitFor(() => gapCount === 2)
 
-    expect(gapCount).toBe(2)
+    expect(await withTimeout(secondSurvivingGap, 5_000)).toEqual({
+      value: undefined,
+      done: false,
+    })
   } finally {
     await gapBus.close()
   }
 
-  expect(gapCount).toBe(2)
+  expect(await survivingStream.next()).toEqual({
+    value: undefined,
+    done: true,
+  })
 })
 
 it("ignores malformed notifications without closing active streams", async () => {
@@ -260,18 +277,4 @@ async function waitForApplicationPid(
   }
 
   throw new Error("PostgreSQL listener did not reconnect in time")
-}
-
-async function waitFor(condition: () => boolean): Promise<void> {
-  const deadline = Date.now() + 5_000
-
-  while (Date.now() < deadline) {
-    if (condition()) {
-      return
-    }
-
-    await Bun.sleep(25)
-  }
-
-  throw new Error("Condition was not met in time")
 }

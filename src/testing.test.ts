@@ -43,10 +43,10 @@ it("tracks a subscription cancelled by its consumer", async () => {
 
 it("records and delivers a batch in order", async () => {
   const eventBus = createTestEventBus()
-  const firstStream = eventBus.on<string>("first")
-  const secondStream = eventBus.on<string>("second")
-  const firstReceived = firstStream.next()
-  const secondReceived = secondStream.next()
+  const stream1 = eventBus.on<string>("first")
+  const stream2 = eventBus.on<string>("second")
+  const firstReceived = stream1.next()
+  const secondReceived = stream2.next()
 
   await eventBus.sendMany([
     { event: "first", payload: "one" },
@@ -62,23 +62,32 @@ it("records and delivers a batch in order", async () => {
   await eventBus.close()
 })
 
-it("simulates delivery gaps", async () => {
-  let deliveryGapCount = 0
-  const eventBus = createTestEventBus({
-    onDeliveryGap: () => deliveryGapCount++,
-  })
+it("simulates delivery gaps for independent consumers", async () => {
+  const eventBus = createTestEventBus()
+  const stream1 = eventBus.deliveryGaps()
+  const controller2 = new AbortController()
+  const stream2 = eventBus.deliveryGaps(controller2.signal)
+  const gap1 = stream1.next()
+  const gap2 = stream2.next()
 
-  expect(deliveryGapCount).toBe(0)
-  eventBus.simulateDeliveryGap()
   eventBus.simulateDeliveryGap()
 
-  expect(deliveryGapCount).toBe(2)
+  expect(await gap1).toEqual({ value: undefined, done: false })
+  expect(await gap2).toEqual({ value: undefined, done: false })
+
+  const nextGap1 = stream1.next()
+  const abortedGap2 = stream2.next()
+  controller2.abort()
+  eventBus.simulateDeliveryGap()
+
+  expect(await nextGap1).toEqual({ value: undefined, done: false })
+  expect(await abortedGap2).toEqual({ value: undefined, done: true })
 
   await eventBus.close()
+  expect(await stream1.next()).toEqual({ value: undefined, done: true })
   expect(() => eventBus.simulateDeliveryGap()).toThrow(
     "Cannot simulate a delivery gap after the test event bus is closed",
   )
-  expect(deliveryGapCount).toBe(2)
 })
 
 it("returns payload snapshots for a typed channel and key", async () => {

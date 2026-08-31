@@ -55,6 +55,8 @@ export interface EventBus extends AsyncDisposable {
     event: string,
     signal?: AbortSignal,
   ): AsyncGenerator<TPayload, void, unknown>
+  /** Streams possible delivery gaps reported after the listener reconnects until the signal aborts. */
+  deliveryGaps(signal?: AbortSignal): AsyncGenerator<void, void, unknown>
   /** Closes the event bus and completes its active event streams. */
   close(): Promise<void>
 }

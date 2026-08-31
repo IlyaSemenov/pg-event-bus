@@ -9,6 +9,7 @@ The package owns a dedicated, reconnecting `LISTEN` connection, while your appli
 ## Install
 
 Node.js 22 or newer is required.
+The package is ESM-only.
 
 ```sh
 npm install pg-event-bus
@@ -209,19 +210,15 @@ PostgreSQL can also coalesce identical channel-and-payload notifications emitted
 
 ### Recover from possible delivery gaps
 
-Pass `onDeliveryGap` when the application needs to restore derived state after a listener reconnect because notifications might have been lost while it was disconnected.
-The callback runs once after every repeated successful `LISTEN`, when the bus is ready to receive notifications again.
-It does not run after the initial `LISTEN` or during a normal `close()`.
+Consume `deliveryGaps()` when the application needs to restore derived state after a listener reconnect because notifications might have been lost while it was disconnected.
+Each active stream receives a signal after every repeated successful `LISTEN`, when the bus is ready to receive notifications again.
+The stream does not yield after the initial `LISTEN` and completes during a normal `close()`.
+An error in one consumer does not affect listener reconnection or other consumers.
 
 ```ts
-const eventBus = createPgEventBus({
-  connectionString: databaseUrl,
-  channel: "my-app",
-  publisher,
-  onDeliveryGap() {
-    invalidateRealtimeViews()
-  },
-})
+for await (const _ of eventBus.deliveryGaps(signal)) {
+  await invalidateRealtimeViews()
+}
 ```
 
 ## Dependency injection
@@ -319,6 +316,7 @@ The in-memory test bus:
 - Clears only the recorded history with `clearCalls()`.
 - Reports active subscriptions through `getActiveSubscriptionCount()`.
 - Simulates a possible delivery gap after a listener reconnects through `simulateDeliveryGap()`.
+- Exposes those simulated delivery gaps through the same `deliveryGaps()` stream as the production bus.
 - Completes all active streams when closed.
 
 When the application contract associates a key with a narrower payload subtype, bind the channel first and pass that subtype explicitly.

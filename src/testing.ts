@@ -1,12 +1,9 @@
 import { EventEmitter } from "node:events"
 
-import type { PgEventBusOptions } from "./bus"
 import type { EventBus, EventBusEvent, EventChannel } from "./channel"
 import { resolveEventChannelName } from "./channel-name"
+import { createDeliveryGaps } from "./gaps"
 import { streamEvents } from "./stream"
-
-/** Configuration for an in-memory test event bus. */
-export type TestEventBusOptions = Pick<PgEventBusOptions, "onDeliveryGap">
 
 /** One event sent through a test event bus. */
 export interface TestEventBusCall {
@@ -55,11 +52,10 @@ export interface TestEventBus extends EventBus {
  *
  * The bus supports consumer cancellation and closes all active streams when closed.
  */
-export function createTestEventBus(
-  options: TestEventBusOptions = {},
-): TestEventBus {
+export function createTestEventBus(): TestEventBus {
   const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
+  const deliveryGaps = createDeliveryGaps(busAbort.signal)
   const calls: TestEventBusCall[] = []
   let activeSubscriptionCount = 0
 
@@ -130,6 +126,7 @@ export function createTestEventBus(
     send,
     sendMany,
     on: onEvent,
+    deliveryGaps: deliveryGaps.stream,
     close,
     [Symbol.asyncDispose]: close,
     calls,
@@ -148,7 +145,7 @@ export function createTestEventBus(
         )
       }
 
-      options.onDeliveryGap?.()
+      void deliveryGaps.emit()
     },
   }
 }
