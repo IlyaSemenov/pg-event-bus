@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.1.0
+
+### Minor Changes
+
+- 8bb90e1: Add fixed-name event channels whose production and test APIs do not require a key.
+
 ## 4.0.0
 
 ### Major Changes
