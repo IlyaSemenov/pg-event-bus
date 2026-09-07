@@ -244,6 +244,11 @@ Keep them small: PostgreSQL notification payloads must be shorter than 8000 byte
 
 PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
 
+Incoming notifications must contain a JSON object with a string `event` field.
+The `payload` field is optional.
+
+Notifications containing unparseable JSON or an invalid event envelope are discarded, and the listener continues receiving subsequent events.
+
 ### Stream lifecycle
 
 `on()` and `deliveryGaps()` register their listeners when called.
