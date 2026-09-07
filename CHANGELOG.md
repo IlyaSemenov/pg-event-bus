@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.1.1
+
+### Patch Changes
+
+- 252525a: Fix `on()` and `deliveryGaps()` to subscribe immediately and buffer events before the first read.
+
 ## 4.1.0
 
 ### Minor Changes
