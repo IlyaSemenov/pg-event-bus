@@ -122,6 +122,8 @@ for await (const event of logEvents.on(signal)) {
 ```
 
 Use an `AbortSignal` to stop the subscription when its consumer disconnects.
+Calling `on()` registers the subscription immediately and buffers arriving events even before the first `next()`.
+See [stream lifecycle](#stream-lifecycle) for cancellation and buffering behavior.
 
 For a keyed channel, `send()` and `on()` take the key of the selected subchannel.
 Every `sendMany()` item carries its own key because one batch can target several subchannels.
@@ -241,6 +243,30 @@ Payloads use JSON serialization and must be JSON-serializable.
 Keep them small: PostgreSQL notification payloads must be shorter than 8000 bytes with the default configuration, and the encoded event name counts toward that limit.
 
 PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
+
+### Stream lifecycle
+
+`on()` and `deliveryGaps()` register their listeners when called.
+Each call creates an independent stream with its own FIFO buffer, including events received before the first `next()` or between reads.
+Concurrent `next()` calls receive values in request order.
+Buffers have no size limit, so consume streams promptly and release subscriptions you no longer need.
+
+- Aborting a consumer signal, with any reason, or closing the bus removes listeners immediately and completes pending reads without an error.
+  Already buffered values remain available in FIFO order before the stream completes.
+- A bus failure removes listeners immediately and rejects the next read after buffered values have been consumed.
+  Only one read rejects; subsequent reads complete normally.
+  With multiple pending reads, the first rejects and the rest complete.
+  An error named `AbortError` is treated as normal completion.
+- The first cancellation or failure determines the stream's outcome; later signals do not replace it.
+- Calling `return()` removes listeners immediately, completes pending reads, and discards unread buffered values and any undelivered error.
+  It works before the first read and while `next()` is waiting.
+  Leaving a `for await` loop with `break` or a consumer exception also releases its subscription.
+- An already aborted consumer signal returns a completed stream without registering listeners.
+  A new stream on a closed bus also completes without registration; a new stream on a failed bus reports that failure unless its consumer signal is already aborted.
+- Cleanup is idempotent and removes both event listeners and abort listeners.
+
+The PostgreSQL bus and the in-memory test bus share these lifecycle rules.
+Registering a stream does not wait for PostgreSQL listener readiness or replay notifications missed before registration.
 
 ### Recover from possible delivery gaps
 
@@ -369,6 +395,8 @@ The in-memory test bus also:
 
 - Records successful individual and batch sends in `calls`, while `clearCalls()` clears only that history.
 - Resolves `ready` immediately.
-- Delivers sends to active subscribers, honors their abort signals, and reports their count through `getActiveSubscriptionCount()`.
+- Delivers sends to registered subscribers and honors their abort signals.
+- Reports registered event subscriptions through `getActiveSubscriptionCount()`, including subscriptions not yet read and excluding delivery gap streams.
+  The count decreases immediately when listeners are removed, even if the stream still has buffered values.
 - Produces delivery gap signals through `simulateDeliveryGap()` and `deliveryGaps()`.
 - Completes all active streams when closed.

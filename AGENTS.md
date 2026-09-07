@@ -31,6 +31,8 @@ Each `deliveryGaps()` call creates an independent stream that receives a signal 
 Delivery gap streams honor their consumer abort signal and complete when the bus closes.
 Consumer failures must not affect listener reconnection or other delivery gap streams.
 
+Keep `on()` and `deliveryGaps()` on the shared eager stream lifecycle for both production and test buses.
+
 When `createEventChannelFactory` receives a resolver, it resolves its `EventBus` when `send()`, `sendMany()`, or `on()` runs.
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
 When it receives an `EventBus` directly, channels remain bound to that instance.

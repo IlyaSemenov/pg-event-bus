@@ -202,3 +202,65 @@ it("closes all subscriptions and rejects later sends", async () => {
   const closedStream = eventBus.on("one")
   expect(await closedStream.next()).toEqual({ value: undefined, done: true })
 })
+
+for (const kind of ["events", "gaps"] as const) {
+  it(`buffers ${kind} from subscription time and drains them after close`, async () => {
+    const bus = createTestEventBus()
+    const stream = kind === "events" ? bus.on("event") : bus.deliveryGaps()
+    if (kind === "events") {
+      expect(bus.getActiveSubscriptionCount()).toBe(1)
+      await bus.send("event", "first")
+      await bus.send("event", "second")
+    } else {
+      expect(bus.getActiveSubscriptionCount()).toBe(0)
+      bus.simulateDeliveryGap()
+      bus.simulateDeliveryGap()
+    }
+    await bus.close()
+
+    expect(bus.getActiveSubscriptionCount()).toBe(0)
+    expect(await stream.next()).toEqual({
+      value: kind === "events" ? "first" : undefined,
+      done: false,
+    })
+    expect(await stream.next()).toEqual({
+      value: kind === "events" ? "second" : undefined,
+      done: false,
+    })
+    expect(await stream.next()).toEqual({ value: undefined, done: true })
+  })
+
+  for (const started of [false, true]) {
+    it(`returns an ${started ? "awaiting" : "unread"} ${kind} stream immediately`, async () => {
+      const bus = createTestEventBus()
+      const stream = kind === "events" ? bus.on("event") : bus.deliveryGaps()
+      const pending = started ? stream.next() : undefined
+      const returned = stream.return()
+      expect(bus.getActiveSubscriptionCount()).toBe(0)
+      expect(await returned).toEqual({ value: undefined, done: true })
+      if (pending)
+        expect(await pending).toEqual({ value: undefined, done: true })
+      expect(await stream.next()).toEqual({ value: undefined, done: true })
+      await bus.close()
+    })
+  }
+}
+
+it("counts only registered subscriptions before reading and after cancellation", async () => {
+  const bus = createTestEventBus()
+  const controller = new AbortController()
+  const first = bus.on("first", controller.signal)
+  const second = bus.on("error")
+  expect(bus.getActiveSubscriptionCount()).toBe(2)
+
+  controller.abort()
+  expect(bus.getActiveSubscriptionCount()).toBe(1)
+  const cancelled = bus.on("cancelled", controller.signal)
+  expect(bus.getActiveSubscriptionCount()).toBe(1)
+  expect(await cancelled.next()).toEqual({ value: undefined, done: true })
+  await first.return()
+  expect(bus.getActiveSubscriptionCount()).toBe(1)
+  await second.return()
+  expect(bus.getActiveSubscriptionCount()).toBe(0)
+  await bus.close()
+})

@@ -77,7 +77,6 @@ export function createTestEventBus(): TestEventBus {
   const busAbort = new AbortController()
   const deliveryGaps = createDeliveryGaps(busAbort.signal)
   const calls: TestEventBusCall[] = []
-  let activeSubscriptionCount = 0
 
   async function send(event: string, payload: unknown) {
     if (busAbort.signal.aborted) {
@@ -102,19 +101,8 @@ export function createTestEventBus(): TestEventBus {
     eventEmitter.emit(event, payload)
   }
 
-  async function* onEvent<TPayload>(event: string, signal?: AbortSignal) {
-    activeSubscriptionCount += 1
-
-    try {
-      yield* streamEvents<TPayload>(
-        eventEmitter,
-        event,
-        busAbort.signal,
-        signal,
-      )
-    } finally {
-      activeSubscriptionCount -= 1
-    }
+  function onEvent<TPayload>(event: string, signal?: AbortSignal) {
+    return streamEvents<TPayload>(eventEmitter, event, busAbort.signal, signal)
   }
 
   async function close() {
@@ -177,7 +165,8 @@ export function createTestEventBus(): TestEventBus {
       calls.length = 0
     },
     getActiveSubscriptionCount() {
-      return activeSubscriptionCount
+      // Every registered stream has one error listener, including streams of "error".
+      return eventEmitter.listenerCount("error")
     },
     simulateDeliveryGap() {
       if (busAbort.signal.aborted) {

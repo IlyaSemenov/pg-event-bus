@@ -56,6 +56,39 @@ it("delivers typed events between separate PostgreSQL connections", async () => 
   expect(await stream.next()).toEqual({ value: undefined, done: true })
 })
 
+it("buffers notifications before the first read using a delivery barrier", async () => {
+  const stream = bus.on<string>("eager-buffer")
+  const barrier = bus.on("eager-barrier")
+  const delivered = barrier.next()
+
+  try {
+    await bus.sendMany([
+      { event: "eager-buffer", payload: "first" },
+      { event: "eager-buffer", payload: "second" },
+      { event: "eager-barrier", payload: null },
+    ])
+    await delivered
+    expect(await stream.next()).toEqual({ value: "first", done: false })
+    expect(await stream.next()).toEqual({ value: "second", done: false })
+  } finally {
+    await stream.return()
+    await barrier.return()
+  }
+})
+
+for (const kind of ["events", "gaps"] as const) {
+  for (const started of [false, true]) {
+    it(`returns a production ${kind} stream ${started ? "during" : "before"} reading`, async () => {
+      const stream = kind === "events" ? bus.on("return") : bus.deliveryGaps()
+      const pending = started ? stream.next() : undefined
+      expect(await stream.return()).toEqual({ value: undefined, done: true })
+      if (pending)
+        expect(await pending).toEqual({ value: undefined, done: true })
+      expect(await stream.next()).toEqual({ value: undefined, done: true })
+    })
+  }
+}
+
 it("delivers a publication batch in input order", async () => {
   const events = createEventChannelFactory(bus)<TestEvent>(
     (key) => `batch:${key}`,
@@ -155,18 +188,21 @@ it("reports a possible delivery gap after each successful reconnect", async () =
   })()
   const failingConsumerError = failingConsumer.catch((error: unknown) => error)
   const survivingStream = gapBus.deliveryGaps()
-  const firstSurvivingGap = survivingStream.next()
+  const initialObserver = gapBus.deliveryGaps()
+  const initialGap = initialObserver.next()
 
   try {
     await gapBus.ready
-    expect(await settlesWithin(firstSurvivingGap, 75)).toBe(false)
+    expect(await settlesWithin(initialGap, 75)).toBe(false)
 
     let listenerPid = await waitForApplicationPid(applicationName)
     await sql`SELECT pg_terminate_backend(${listenerPid})`
     listenerPid = await waitForApplicationPid(applicationName, listenerPid)
 
     expect(await failingConsumerError).toBe(expectedConsumerError)
-    expect(await withTimeout(firstSurvivingGap, 5_000)).toEqual({
+    expect(await initialGap).toEqual({ value: undefined, done: false })
+    await initialObserver.return()
+    expect(await survivingStream.next()).toEqual({
       value: undefined,
       done: false,
     })
