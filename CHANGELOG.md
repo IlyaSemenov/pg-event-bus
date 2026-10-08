@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.2.0
+
+### Minor Changes
+
+- 124d6d7: Add the `scopeEventName` option to `createEventChannelFactory` to scope the event names of every channel by the current context, such as the active tenant.
+
 ## 4.1.1
 
 ### Patch Changes
