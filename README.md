@@ -334,6 +334,21 @@ export const commentEvents = defineEventChannel<CommentEvent>(
 )
 ```
 
+### Scoped channels
+
+An application that serves several isolated scopes, such as tenants, can scope the event names of every channel created by a factory.
+`scopeEventName` maps each channel's event name to the name used by the bus whenever the application publishes or subscribes, so it can read the current scope from dependency injection.
+
+```ts
+export const defineTenantEventChannel = createEventChannelFactory(useEventBus, {
+  scopeEventName: event => `tenant:${useTenant().id}:${event}`,
+})
+
+export const logEvents = defineTenantEventChannel<LogEvent>("log")
+```
+
+A subscriber of `logEvents` then receives only the events its tenant publishes, while the channel declaration stays unaware of tenants.
+
 ### Testing with TestEventBus
 
 Create an in-memory event bus and provide it as the dependency override for each test.
@@ -395,6 +410,8 @@ const createdEvents = testEventBus
   .for(activityEvents)
   .payloadsFor<CommentCreatedEvent>("created")
 ```
+
+`payloadsFor()` resolves the event names of a scoped channel in the context where it runs, so inspect the channel inside the same scope that published its events.
 
 The in-memory test bus also:
 

@@ -36,3 +36,28 @@ it("resolves a scoped override after the domain channel is declared", async () =
     },
   ])
 })
+
+it("isolates and inspects scoped channels in the current dependency context", async () => {
+  const test = createTestEventBus()
+  const useTenant = defineDependency<string>({ name: "tenant" })
+  const defineTenantEventChannel = createEventChannelFactory(useEventBus, {
+    scopeEventName: (event) => `tenant:${useTenant()}:${event}`,
+  })
+  const logEvents = defineTenantEventChannel<string>("log")
+  const inTenant = <T>(tenant: string, fn: () => T) =>
+    withOverrides([provide(useEventBus, test), provide(useTenant, tenant)], fn)
+
+  const tenantOneEvents = await inTenant("one", () => logEvents.on())
+  await inTenant("two", () => logEvents.send("two-message"))
+  await inTenant("one", () => logEvents.send("one-message"))
+
+  expect((await tenantOneEvents.next()).value).toBe("one-message")
+  expect(await inTenant("one", () => test.payloadsFor(logEvents))).toEqual([
+    "one-message",
+  ])
+  expect(await inTenant("two", () => test.payloadsFor(logEvents))).toEqual([
+    "two-message",
+  ])
+
+  await tenantOneEvents.return()
+})

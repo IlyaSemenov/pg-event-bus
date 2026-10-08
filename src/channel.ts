@@ -1,9 +1,10 @@
 import { registerEventChannel } from "./channel-name"
 
 /**
- * Typed handle for one domain event with a fixed transport name.
+ * Typed handle for one domain event with a fixed event name.
  *
  * Every operation uses the same event name, so the application does not supply a key.
+ * The factory's `scopeEventName` may still map it to a different bus name depending on the operation's context.
  */
 export interface EventChannel<TPayload> {
   /** Publishes one payload. */
@@ -86,7 +87,7 @@ export interface EventBus extends AsyncDisposable {
  * Defines a typed event channel with either a fixed event name or a function that maps keys to event names.
  */
 export interface DefineEventChannel {
-  /** Defines a channel whose operations always use the supplied event name. */
+  /** Defines a channel whose operations use the supplied event name without a key. */
   <TPayload>(event: string): EventChannel<TPayload>
   /**
    * Defines a family of events whose key is mapped to a concrete event name.
@@ -98,11 +99,22 @@ export interface DefineEventChannel {
   ): KeyedEventChannel<TPayload, TKey>
 }
 
+/** Options shared by every channel created by one channel factory. */
+export interface EventChannelFactoryOptions {
+  /**
+   * Maps the event name of every channel to the name used by the bus.
+   *
+   * It runs for every `send()`, `sendMany()`, and `on()` call and when a test event bus inspects a channel, so it may read the current context, such as the active tenant, to isolate events of separate scopes.
+   */
+  scopeEventName?: (event: string) => string
+}
+
 /**
  * Creates a channel factory bound to one event bus.
  */
 export function createEventChannelFactory(
   eventBus: EventBus,
+  options?: EventChannelFactoryOptions,
 ): DefineEventChannel
 
 /**
@@ -112,10 +124,12 @@ export function createEventChannelFactory(
  */
 export function createEventChannelFactory(
   getEventBus: () => EventBus,
+  options?: EventChannelFactoryOptions,
 ): DefineEventChannel
 
 export function createEventChannelFactory(
   eventBusOrResolver: EventBus | (() => EventBus),
+  { scopeEventName }: EventChannelFactoryOptions = {},
 ): DefineEventChannel {
   const getEventBus =
     typeof eventBusOrResolver === "function"
@@ -129,12 +143,21 @@ export function createEventChannelFactory(
   function defineEventChannel<TPayload, TKey = string>(
     eventOrBuildName: string | ((key: TKey) => string),
   ): EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey> {
+    const buildEventName =
+      typeof eventOrBuildName === "string"
+        ? () => eventOrBuildName
+        : eventOrBuildName
+    const buildName = scopeEventName
+      ? (key: TKey) => scopeEventName(buildEventName(key))
+      : buildEventName
     const channel =
       typeof eventOrBuildName === "string"
-        ? createEventChannel<TPayload>(getEventBus, eventOrBuildName)
-        : createKeyedEventChannel<TPayload, TKey>(getEventBus, eventOrBuildName)
+        ? createEventChannel<TPayload>(getEventBus, () =>
+            buildName(undefined as TKey),
+          )
+        : createKeyedEventChannel<TPayload, TKey>(getEventBus, buildName)
 
-    registerEventChannel(channel, eventOrBuildName)
+    registerEventChannel(channel, buildName)
 
     return channel
   }
@@ -144,14 +167,18 @@ export function createEventChannelFactory(
 
 function createEventChannel<TPayload>(
   getEventBus: () => EventBus,
-  event: string,
+  getEvent: () => string,
 ): EventChannel<TPayload> {
   return {
-    send: (payload) => getEventBus().send(event, payload),
-    sendMany: (payloads) =>
-      getEventBus().sendMany(payloads.map((payload) => ({ event, payload }))),
+    send: (payload) => getEventBus().send(getEvent(), payload),
+    sendMany: (payloads) => {
+      const event = getEvent()
+      return getEventBus().sendMany(
+        payloads.map((payload) => ({ event, payload })),
+      )
+    },
     on: <TEvent extends TPayload = TPayload>(signal?: AbortSignal) =>
-      getEventBus().on<TEvent>(event, signal),
+      getEventBus().on<TEvent>(getEvent(), signal),
   }
 }
 

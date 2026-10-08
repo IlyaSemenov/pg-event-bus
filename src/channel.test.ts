@@ -56,6 +56,36 @@ it("uses a fixed event name and resolves the event bus for every operation", asy
   ])
 })
 
+it("scopes the event names of every channel for every operation", async () => {
+  const test = createTestEventBus()
+  let scope = "one"
+  const defineEventChannel = createEventChannelFactory(test.bus, {
+    scopeEventName: (event) => `${scope}:${event}`,
+  })
+  const logEvents = defineEventChannel<{ id: string }>("log")
+  const entityEvents = defineEventChannel<{ id: string }>(
+    (key) => `entity:${key}`,
+  )
+  const controller = new AbortController()
+
+  await logEvents.send({ id: "first" })
+  scope = "two"
+  await logEvents.sendMany([{ id: "second" }])
+  await entityEvents.send("key", { id: "third" })
+  await logEvents.on(controller.signal).next()
+  await entityEvents.on("key", controller.signal).next()
+
+  expect(test.calls).toEqual([
+    { event: "one:log", payload: { id: "first" } },
+    { event: "two:log", payload: { id: "second" } },
+    { event: "two:entity:key", payload: { id: "third" } },
+  ])
+  expect(test.subscriptions).toEqual([
+    { event: "two:log", signal: controller.signal },
+    { event: "two:entity:key", signal: controller.signal },
+  ])
+})
+
 function createTestEventBus() {
   const calls: Array<{ event: string; payload: unknown }> = []
   const batches: Array<readonly { event: string; payload: unknown }[]> = []

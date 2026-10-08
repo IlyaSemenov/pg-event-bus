@@ -37,7 +37,8 @@ When `createEventChannelFactory` receives a resolver, it resolves its `EventBus`
 Channels declared at module load therefore observe dependency-injection overrides active during an operation.
 When it receives an `EventBus` directly, channels remain bound to that instance.
 String definitions create event channels with one fixed event name, while function definitions create keyed event channels.
-Keep each channel's fixed event name or event-name resolver in library-private metadata so test instrumentation can resolve channels without reconstructing transport names.
+In both cases the bus name is the factory's `scopeEventName` applied to that event name when an operation runs, not when the channel is declared.
+Keep each channel's event-name resolver, including the factory scope, in library-private metadata so test instrumentation can resolve channels without reconstructing transport names.
 
 ## Documentation
 

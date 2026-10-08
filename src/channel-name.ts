@@ -1,24 +1,22 @@
-type EventChannelNameDefinition = string | ((key: never) => string)
+type BuildEventChannelName = (key: never) => string
 
-const eventNames = new WeakMap<object, EventChannelNameDefinition>()
+const eventNames = new WeakMap<object, BuildEventChannelName>()
 
 export function registerEventChannel(
   channel: object,
-  eventOrBuildName: EventChannelNameDefinition,
+  buildName: BuildEventChannelName,
 ) {
-  eventNames.set(channel, eventOrBuildName)
+  eventNames.set(channel, buildName)
 }
 
 export function resolveEventChannelName(channel: object, key?: unknown) {
-  const eventOrBuildName = eventNames.get(channel)
+  const buildName = eventNames.get(channel)
 
-  if (eventOrBuildName === undefined) {
+  if (buildName === undefined) {
     throw new TypeError(
       "Expected an event channel created by createEventChannelFactory",
     )
   }
 
-  return typeof eventOrBuildName === "string"
-    ? eventOrBuildName
-    : eventOrBuildName(key as never)
+  return buildName(key as never)
 }
