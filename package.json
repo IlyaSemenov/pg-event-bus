@@ -40,13 +40,13 @@
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
-    "@biomejs/biome": "^2.5.5",
-    "@changesets/cli": "^2.31.1",
-    "@tsconfig/bun": "^1.0.10",
+    "@biomejs/biome": "^2.6.4",
+    "@changesets/cli": "^3.0.3",
+    "@tsconfig/bun": "^1.0.11",
     "@types/bun": "^1.4.4",
-    "publint": "^0.3.22",
+    "publint": "^0.3.25",
     "ripple-di": "^1.0.0",
-    "tsdown": "^0.22.14",
+    "tsdown": "^0.23.4",
     "typescript": "^7.0.2"
   },
   "dependencies": {
