@@ -16,7 +16,7 @@
         "oxfmt": "^0.75.0",
         "oxlint": "^1.90.0",
         "publint": "^0.3.25",
-        "ripple-di": "^1.0.0",
+        "ripple-di": "^3.2.0",
         "tsdown": "^0.23.4",
         "typescript": "^7.0.2",
       },
@@ -477,7 +477,7 @@
 
     "resolve-pkg-maps": ["resolve-pkg-maps@1.0.0", "", {}, "sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw=="],
 
-    "ripple-di": ["ripple-di@1.0.0", "", {}, "sha512-ArsevYD/cJHjrsBR1yXB7U9E9cVO2P7569WLpBiJlA0SydT7ip++pksz9L0g3Bh+LmR/kvaHE4wg9YOvYbRq9Q=="],
+    "ripple-di": ["ripple-di@3.2.0", "", {}, "sha512-pRu11/ZLp3ksfHNhES3MbsuYKZhAvlNyXZjfN9kE4oq9rZRL/TyAAHZEUvwkMHrWwOJE6wkaqKdzk3T5TSf3YQ=="],
 
     "rolldown": ["rolldown@1.2.16", "", { "dependencies": { "@oxc-project/types": "=0.156.0", "@rolldown/pluginutils": "^1.0.0" }, "optionalDependencies": { "@rolldown/binding-android-arm-eabi": "1.2.16", "@rolldown/binding-android-arm64": "1.2.16", "@rolldown/binding-darwin-arm64": "1.2.16", "@rolldown/binding-darwin-x64": "1.2.16", "@rolldown/binding-freebsd-x64": "1.2.16", "@rolldown/binding-linux-arm-gnueabihf": "1.2.16", "@rolldown/binding-linux-arm64-gnu": "1.2.16", "@rolldown/binding-linux-arm64-musl": "1.2.16", "@rolldown/binding-linux-ppc64-gnu": "1.2.16", "@rolldown/binding-linux-s390x-gnu": "1.2.16", "@rolldown/binding-linux-x64-gnu": "1.2.16", "@rolldown/binding-linux-x64-musl": "1.2.16", "@rolldown/binding-openharmony-arm64": "1.2.16", "@rolldown/binding-win32-arm64-msvc": "1.2.16", "@rolldown/binding-win32-x64-msvc": "1.2.16" }, "bin": { "rolldown": "./bin/cli.mjs" } }, "sha512-bWvlMpFKiTfDKfnK7FC2MPgPeWCf/Kpwsq49ApdW+FQaBZb6O6dZ4MAPbPUjp7hYQrw/RobqCzn64BRrQecGHw=="],
 

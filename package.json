@@ -47,7 +47,7 @@
     "oxfmt": "^0.75.0",
     "oxlint": "^1.90.0",
     "publint": "^0.3.25",
-    "ripple-di": "^1.0.0",
+    "ripple-di": "^3.2.0",
     "tsdown": "^0.23.4",
     "typescript": "^7.0.2"
   },
