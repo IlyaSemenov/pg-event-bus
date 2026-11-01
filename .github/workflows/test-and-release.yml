@@ -65,6 +65,18 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost
 
+      # The locked Postgres.js is the newest major; also check the oldest supported one.
+      - name: Test package with Postgres.js 3
+        run: |
+          bun add postgres@3 --no-save
+          bun run types
+          bun run test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost
+
+      - name: Restore locked dependencies
+        run: bun install --frozen-lockfile
+
       - name: Capture release version
         if: ${{ github.ref == env.MAIN_REF }}
         run: |
