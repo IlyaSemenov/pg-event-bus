@@ -1,31 +1,27 @@
 {
   "name": "pg-event-bus",
-  "type": "module",
   "version": "4.2.0",
-  "packageManager": "bun@1.4.4",
   "description": "PostgreSQL event bus",
-  "sideEffects": false,
-  "engines": {
-    "node": ">=22"
-  },
-  "author": "Ilya Semenov",
+  "homepage": "https://github.com/IlyaSemenov/pg-event-bus#readme",
+  "bugs": "https://github.com/IlyaSemenov/pg-event-bus/issues",
   "license": "MIT",
+  "author": "Ilya Semenov",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/IlyaSemenov/pg-event-bus.git"
   },
-  "homepage": "https://github.com/IlyaSemenov/pg-event-bus#readme",
-  "bugs": "https://github.com/IlyaSemenov/pg-event-bus/issues",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": "./dist/index.mjs",
     "./testing": "./dist/testing.mjs",
     "./package.json": "./package.json"
   },
-  "types": "./dist/index.d.mts",
-  "files": [
-    "README.md",
-    "dist"
-  ],
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -36,20 +32,27 @@
     "types": "bun check && bun check -p tests",
     "test": "bun test",
     "prepublishOnly": "bun run build",
-    "lint": "biome check --write ."
+    "lint": "oxlint --fix && oxfmt",
+    "lint:check": "oxlint && oxfmt --check"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
-    "@biomejs/biome": "^2.6.4",
     "@changesets/cli": "^3.0.3",
+    "@ilyasemenov/oxc-config": "^0.1.1",
     "@tsconfig/bun": "^1.0.11",
     "@types/bun": "^1.4.4",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
     "publint": "^0.3.25",
     "ripple-di": "^1.0.0",
     "tsdown": "^0.23.4",
     "typescript": "^7.0.2"
   },
-  "dependencies": {
-    "postgres": "^3.4.9"
-  }
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "bun@1.4.4"
 }
