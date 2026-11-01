@@ -1,6 +1,6 @@
 {
   "name": "pg-event-bus",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "PostgreSQL event bus",
   "homepage": "https://github.com/IlyaSemenov/pg-event-bus#readme",
   "bugs": "https://github.com/IlyaSemenov/pg-event-bus/issues",

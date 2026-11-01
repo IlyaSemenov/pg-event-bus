@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.3.0
+
+### Minor Changes
+
+- cf16d19: Support Postgres.js 4 alongside Postgres.js 3.
+
 ## 4.2.0
 
 ### Minor Changes
