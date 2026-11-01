@@ -36,7 +36,7 @@
     "lint:check": "oxlint && oxfmt --check"
   },
   "dependencies": {
-    "postgres": "^3.4.9"
+    "postgres": "^3 || ^4"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
