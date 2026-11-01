@@ -2,7 +2,7 @@
   "name": "pg-event-bus",
   "type": "module",
   "version": "4.2.0",
-  "packageManager": "bun@1.3.14",
+  "packageManager": "bun@1.4.4",
   "description": "PostgreSQL event bus",
   "sideEffects": false,
   "engines": {
@@ -43,7 +43,7 @@
     "@biomejs/biome": "^2.5.5",
     "@changesets/cli": "^2.31.1",
     "@tsconfig/bun": "^1.0.10",
-    "@types/bun": "^1.3.14",
+    "@types/bun": "^1.4.4",
     "publint": "^0.3.22",
     "ripple-di": "^1.0.0",
     "tsdown": "^0.22.14",
