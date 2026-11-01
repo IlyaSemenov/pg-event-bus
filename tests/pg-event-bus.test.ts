@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "bun:test"
+import { type AddressInfo, connect, createServer, type Socket } from "node:net"
 
 import {
   createEventChannelFactory,
@@ -212,6 +213,41 @@ it("reports a possible delivery gap after each successful reconnect", async () =
   })
 })
 
+it("reconnects after the database refuses connections for a while", async () => {
+  const proxy = await startConnectionProxy()
+  const outageBus = createPgEventBus({
+    connectionString: proxy.connectionString,
+    channel: `${postgresChannel}_outage`,
+    publisher,
+  })
+  const events = createEventChannelFactory(outageBus)<TestEvent>(key => `outage:${key}`)
+  const controller = new AbortController()
+  const stream = events.on("first", controller.signal)
+  const gaps = outageBus.deliveryGaps(controller.signal)
+
+  try {
+    await outageBus.ready
+    const gap = gaps.next()
+
+    // Simulates a database restart: drop the listener connection, then refuse reconnection attempts.
+    await proxy.stop()
+    await Bun.sleep(250)
+    await proxy.start()
+
+    expect(await withTimeout(gap, 5_000)).toEqual({ value: undefined, done: false })
+    const received = stream.next()
+    await events.send("first", { id: "after-outage", value: 5 })
+    expect(await withTimeout(received, 5_000)).toEqual({
+      value: { id: "after-outage", value: 5 },
+      done: false,
+    })
+  } finally {
+    controller.abort()
+    await outageBus.close()
+    await proxy.stop()
+  }
+}, 15_000)
+
 it("ignores malformed notifications without closing active streams", async () => {
   const events = createEventChannelFactory(bus)<TestEvent>(key => `malformed:${key}`)
   const controller = new AbortController()
@@ -262,6 +298,50 @@ async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promis
       throw new Error(`Timed out after ${milliseconds}ms`)
     }),
   ])
+}
+
+/**
+ * Starts a TCP proxy to the test database that can drop its connections and refuse new ones.
+ */
+async function startConnectionProxy() {
+  const target = new URL(connectionString)
+  const targetHost = target.hostname || "localhost"
+  const targetPort = Number(target.port || 5432)
+  const sockets = new Set<Socket>()
+  let port = 0
+  const server = createServer(client => {
+    const upstream = connect(targetPort, targetHost)
+    const drop = () => {
+      client.destroy()
+      upstream.destroy()
+    }
+    sockets.add(client).add(upstream)
+    client.on("error", drop).on("close", drop)
+    upstream.on("error", drop).on("close", drop)
+    client.pipe(upstream).pipe(client)
+  })
+
+  function start() {
+    return new Promise<void>(resolve => server.listen(port, "127.0.0.1", resolve))
+  }
+
+  await start()
+  port = (server.address() as AddressInfo).port
+  const proxied = new URL(connectionString)
+  proxied.host = `127.0.0.1:${port}`
+
+  return {
+    connectionString: proxied.toString(),
+    start,
+    /** Closes open connections and refuses new ones until `start()`. */
+    stop() {
+      for (const socket of sockets) socket.destroy()
+      sockets.clear()
+      return new Promise<void>(resolve =>
+        server.listening ? server.close(() => resolve()) : resolve(),
+      )
+    },
+  }
 }
 
 async function waitForListenerPid(excludedPid?: number): Promise<number> {
