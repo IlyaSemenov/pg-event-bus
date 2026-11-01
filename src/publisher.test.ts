@@ -9,7 +9,7 @@ import {
 
 it("builds one parameterized query for a notification batch", async () => {
   const queries: PgPublisherQuery[] = []
-  const publisher = createPublisher((query) => {
+  const publisher = createPublisher(query => {
     queries.push(query)
   })
   const notifications = [
@@ -27,7 +27,7 @@ it("builds one parameterized query for a notification batch", async () => {
 
 it("passes encoded notifications directly to a raw publisher", async () => {
   let received: readonly PgNotification[] | undefined
-  const publisher = createRawPublisher((notifications) => {
+  const publisher = createRawPublisher(notifications => {
     received = notifications
   })
   const notifications = [{ channel: "application", payload: "payload" }]

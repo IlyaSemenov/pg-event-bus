@@ -12,9 +12,7 @@ it("records and delivers events", async () => {
   await eventBus.send("entity:one", { id: "first" })
 
   expect(await received).toEqual({ value: { id: "first" }, done: false })
-  expect(eventBus.calls).toEqual([
-    { event: "entity:one", payload: { id: "first" } },
-  ])
+  expect(eventBus.calls).toEqual([{ event: "entity:one", payload: { id: "first" } }])
   expect(eventBus.getActiveSubscriptionCount()).toBe(1)
 
   eventBus.clearCalls()
@@ -93,12 +91,8 @@ it("simulates delivery gaps for independent consumers", async () => {
 it("returns payload snapshots for a typed channel and key", async () => {
   const eventBus = createTestEventBus()
   const defineEventChannel = createEventChannelFactory(eventBus)
-  const firstChannel = defineEventChannel<{ id: string }, { id: string }>(
-    (key) => `first:${key.id}`,
-  )
-  const secondChannel = defineEventChannel<{ id: string }>(
-    (key) => `second:${key}`,
-  )
+  const firstChannel = defineEventChannel<{ id: string }, { id: string }>(key => `first:${key.id}`)
+  const secondChannel = defineEventChannel<{ id: string }>(key => `second:${key}`)
 
   await firstChannel.send({ id: "one" }, { id: "first" })
   await secondChannel.send("one", { id: "other-channel" })
@@ -124,9 +118,7 @@ it("returns payload snapshots for a typed channel and key", async () => {
 
 it("records, delivers, and inspects a fixed-name channel", async () => {
   const eventBus = createTestEventBus()
-  const events = createEventChannelFactory(eventBus)<{ id: string }>(
-    "activity_log",
-  )
+  const events = createEventChannelFactory(eventBus)<{ id: string }>("activity_log")
   const stream = events.on()
   const firstReceived = stream.next()
 
@@ -148,11 +140,7 @@ it("records, delivers, and inspects a fixed-name channel", async () => {
     value: { id: "third" },
     done: false,
   })
-  expect(eventBus.payloadsFor(events)).toEqual([
-    { id: "first" },
-    { id: "second" },
-    { id: "third" },
-  ])
+  expect(eventBus.payloadsFor(events)).toEqual([{ id: "first" }, { id: "second" }, { id: "third" }])
   expect(eventBus.for(events).payloadsFor()).toEqual([
     { id: "first" },
     { id: "second" },
@@ -238,8 +226,7 @@ for (const kind of ["events", "gaps"] as const) {
       const returned = stream.return()
       expect(bus.getActiveSubscriptionCount()).toBe(0)
       expect(await returned).toEqual({ value: undefined, done: true })
-      if (pending)
-        expect(await pending).toEqual({ value: undefined, done: true })
+      if (pending) expect(await pending).toEqual({ value: undefined, done: true })
       expect(await stream.next()).toEqual({ value: undefined, done: true })
       await bus.close()
     })

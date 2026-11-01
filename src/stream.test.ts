@@ -6,11 +6,7 @@ import { streamEvents } from "./stream"
 it("routes the selected event as an async stream", async () => {
   const eventEmitter = new EventEmitter()
   const busAbort = new AbortController()
-  const stream = streamEvents<{ id: string }>(
-    eventEmitter,
-    "selected",
-    busAbort.signal,
-  )
+  const stream = streamEvents<{ id: string }>(eventEmitter, "selected", busAbort.signal)
   const received = stream.next()
 
   eventEmitter.emit("other", { id: "ignored" })
@@ -26,18 +22,8 @@ it("completes only the stream cancelled by its consumer", async () => {
   const busAbort = new AbortController()
   const controller1 = new AbortController()
   const controller2 = new AbortController()
-  const stream1 = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    controller1.signal,
-  )
-  const stream2 = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    controller2.signal,
-  )
+  const stream1 = streamEvents(eventEmitter, "event", busAbort.signal, controller1.signal)
+  const stream2 = streamEvents(eventEmitter, "event", busAbort.signal, controller2.signal)
   const result1 = stream1.next()
   const result2 = stream2.next()
 
@@ -67,12 +53,7 @@ it("completes for an already aborted consumer signal", async () => {
   const consumerAbort = new AbortController()
   consumerAbort.abort()
 
-  const stream = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    consumerAbort.signal,
-  )
+  const stream = streamEvents(eventEmitter, "event", busAbort.signal, consumerAbort.signal)
 
   expect(await stream.next()).toEqual({ value: undefined, done: true })
 })
@@ -81,12 +62,7 @@ it("treats a custom consumer abort reason as cancellation", async () => {
   const eventEmitter = new EventEmitter()
   const busAbort = new AbortController()
   const consumerAbort = new AbortController()
-  const stream = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    consumerAbort.signal,
-  )
+  const stream = streamEvents(eventEmitter, "event", busAbort.signal, consumerAbort.signal)
   const received = stream.next()
 
   consumerAbort.abort(new Error("consumer stopped"))
@@ -98,12 +74,7 @@ it("honors consumer cancellation before a bus failure", async () => {
   const eventEmitter = new EventEmitter()
   const busAbort = new AbortController()
   const consumerAbort = new AbortController()
-  const stream = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    consumerAbort.signal,
-  )
+  const stream = streamEvents(eventEmitter, "event", busAbort.signal, consumerAbort.signal)
   const received = stream.next()
 
   consumerAbort.abort()
@@ -117,12 +88,7 @@ it("reports a bus failure before consumer cancellation", async () => {
   const busAbort = new AbortController()
   const consumerAbort = new AbortController()
   const expected = new Error("listener failed")
-  const stream = streamEvents(
-    eventEmitter,
-    "event",
-    busAbort.signal,
-    consumerAbort.signal,
-  )
+  const stream = streamEvents(eventEmitter, "event", busAbort.signal, consumerAbort.signal)
   const received = stream.next()
 
   busAbort.abort(expected)
@@ -197,7 +163,7 @@ for (const source of ["consumer", "bus"] as const) {
     const bus = new AbortController()
     const consumer = new AbortController()
     const registrations: unknown[] = []
-    emitter.on("newListener", (event) => registrations.push(event))
+    emitter.on("newListener", event => registrations.push(event))
     if (source === "consumer") consumer.abort(new Error("cancelled"))
     else bus.abort()
 
@@ -218,9 +184,7 @@ for (const source of ["bus", "emitter"] as const) {
       const consumer = new AbortController()
       const stream = streamEvents(emitter, "event", bus.signal, consumer.signal)
       const error = new Error("failed")
-      const pending = buffered
-        ? []
-        : [stream.next(), stream.next(), stream.next()]
+      const pending = buffered ? [] : [stream.next(), stream.next(), stream.next()]
       if (buffered) {
         emitter.emit("event", "first")
         emitter.emit("event", "second")

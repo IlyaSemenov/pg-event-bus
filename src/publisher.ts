@@ -25,9 +25,7 @@ export interface PgPublisherQuery {
 }
 
 /** Executes a publisher query through an application-owned database connection. */
-export type ExecutePgPublisherQuery = (
-  query: PgPublisherQuery,
-) => unknown | PromiseLike<unknown>
+export type ExecutePgPublisherQuery = (query: PgPublisherQuery) => unknown | PromiseLike<unknown>
 
 const publishNotificationsText = `SELECT pg_notify(
   notification.value->>'channel',
@@ -40,10 +38,8 @@ ORDER BY notification.position`
 /**
  * Creates a publisher that runs the package-owned `pg_notify` query through the application's current database connection.
  */
-export function createPublisher(
-  executeQuery: ExecutePgPublisherQuery,
-): PgEventPublisher {
-  return (notifications) =>
+export function createPublisher(executeQuery: ExecutePgPublisherQuery): PgEventPublisher {
+  return notifications =>
     executeQuery({
       text: publishNotificationsText,
       values: [JSON.stringify(notifications)],
@@ -51,8 +47,6 @@ export function createPublisher(
 }
 
 /** Creates a publisher from a callback that receives encoded notifications directly. */
-export function createRawPublisher(
-  publisher: PgEventPublisher,
-): PgEventPublisher {
+export function createRawPublisher(publisher: PgEventPublisher): PgEventPublisher {
   return publisher
 }

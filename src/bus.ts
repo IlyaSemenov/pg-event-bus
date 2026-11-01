@@ -76,9 +76,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
 
   async function send(event: string, payload: unknown) {
     if (closed) {
-      throw new Error(
-        "Cannot send an event after the PostgreSQL event bus is closed",
-      )
+      throw new Error("Cannot send an event after the PostgreSQL event bus is closed")
     }
 
     await options.publisher([
@@ -91,9 +89,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
 
   async function sendMany(events: readonly EventBusEvent[]) {
     if (closed) {
-      throw new Error(
-        "Cannot send events after the PostgreSQL event bus is closed",
-      )
+      throw new Error("Cannot send events after the PostgreSQL event bus is closed")
     }
 
     if (events.length === 0) {

@@ -1,11 +1,6 @@
 import { EventEmitter } from "node:events"
 
-import type {
-  EventBus,
-  EventBusEvent,
-  EventChannel,
-  KeyedEventChannel,
-} from "./channel"
+import type { EventBus, EventBusEvent, EventChannel, KeyedEventChannel } from "./channel"
 import { resolveEventChannelName } from "./channel-name"
 import { createDeliveryGaps } from "./gaps"
 import { streamEvents } from "./stream"
@@ -52,9 +47,7 @@ export interface TestEventBus extends EventBus {
     key: TKey,
   ): readonly TPayload[]
   /** Returns test instrumentation bound to a fixed-name `channel`. */
-  for<TPayload>(
-    channel: EventChannel<TPayload>,
-  ): TestEventChannelInspector<TPayload>
+  for<TPayload>(channel: EventChannel<TPayload>): TestEventChannelInspector<TPayload>
   /** Returns test instrumentation bound to `channel`. */
   for<TPayload, TKey>(
     channel: KeyedEventChannel<TPayload, TKey>,
@@ -112,14 +105,10 @@ export function createTestEventBus(): TestEventBus {
   function recordedPayloadsFor<TPayload>(channel: object, key?: unknown) {
     const event = resolveEventChannelName(channel, key)
 
-    return calls
-      .filter((call) => call.event === event)
-      .map((call) => call.payload as TPayload)
+    return calls.filter(call => call.event === event).map(call => call.payload as TPayload)
   }
 
-  function payloadsFor<TPayload>(
-    channel: EventChannel<TPayload>,
-  ): readonly TPayload[]
+  function payloadsFor<TPayload>(channel: EventChannel<TPayload>): readonly TPayload[]
   function payloadsFor<TPayload, TKey>(
     channel: KeyedEventChannel<TPayload, TKey>,
     key: TKey,
@@ -131,17 +120,13 @@ export function createTestEventBus(): TestEventBus {
     return recordedPayloadsFor<TPayload>(channel, key)
   }
 
-  function inspect<TPayload>(
-    channel: EventChannel<TPayload>,
-  ): TestEventChannelInspector<TPayload>
+  function inspect<TPayload>(channel: EventChannel<TPayload>): TestEventChannelInspector<TPayload>
   function inspect<TPayload, TKey>(
     channel: KeyedEventChannel<TPayload, TKey>,
   ): TestKeyedEventChannelInspector<TPayload, TKey>
   function inspect<TPayload, TKey>(
     channel: EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey>,
-  ):
-    | TestEventChannelInspector<TPayload>
-    | TestKeyedEventChannelInspector<TPayload, TKey> {
+  ): TestEventChannelInspector<TPayload> | TestKeyedEventChannelInspector<TPayload, TKey> {
     const inspector = {
       payloadsFor: <TEvent extends TPayload = TPayload>(key?: TKey) =>
         recordedPayloadsFor<TEvent>(channel, key),
@@ -170,9 +155,7 @@ export function createTestEventBus(): TestEventBus {
     },
     simulateDeliveryGap() {
       if (busAbort.signal.aborted) {
-        throw new Error(
-          "Cannot simulate a delivery gap after the test event bus is closed",
-        )
+        throw new Error("Cannot simulate a delivery gap after the test event bus is closed")
       }
 
       void deliveryGaps.emit()

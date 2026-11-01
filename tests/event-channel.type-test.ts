@@ -34,15 +34,11 @@ declare const eventBus: EventBus
 const defineEventChannel = createEventChannelFactory(eventBus)
 
 const auditEvents = defineEventChannel<ActivityEvent>("audit")
-const commentEvents = defineEventChannel<CommentEvent>(
-  (postId) => `post:${postId}:comment`,
-)
+const commentEvents = defineEventChannel<CommentEvent>(postId => `post:${postId}:comment`)
 const chatEvents = defineEventChannel<ChatEvent, SessionKey>(
-  (session) => `chat:${session.userId}:${session.scope}`,
+  session => `chat:${session.userId}:${session.scope}`,
 )
-const activityEvents = defineEventChannel<ActivityEvent>(
-  (scope) => `activity:${scope}`,
-)
+const activityEvents = defineEventChannel<ActivityEvent>(scope => `activity:${scope}`)
 const eventChannel: EventChannel<ActivityEvent> = auditEvents
 const keyedEventChannel: KeyedEventChannel<CommentEvent> = commentEvents
 
@@ -51,10 +47,10 @@ auditEvents.sendMany([
   { kind: "created", commentId: "first-comment" },
   { kind: "deleted", commentId: "second-comment" },
 ])
-const auditStream: AsyncGenerator<ActivityEvent, void, unknown> =
-  auditEvents.on()
-const auditSignalStream: AsyncGenerator<ActivityEvent, void, unknown> =
-  auditEvents.on(new AbortController().signal)
+const auditStream: AsyncGenerator<ActivityEvent, void, unknown> = auditEvents.on()
+const auditSignalStream: AsyncGenerator<ActivityEvent, void, unknown> = auditEvents.on(
+  new AbortController().signal,
+)
 const createdAuditStream: AsyncGenerator<CreatedActivity, void, unknown> =
   auditEvents.on<CreatedActivity>()
 
@@ -65,10 +61,7 @@ void eventChannel
 void keyedEventChannel
 
 commentEvents.send("post-id", { commentId: "comment-id" })
-chatEvents.send(
-  { userId: "user-id", scope: "support" },
-  { messageId: "message-id" },
-)
+chatEvents.send({ userId: "user-id", scope: "support" }, { messageId: "message-id" })
 commentEvents.sendMany([
   { key: "first-post", payload: { commentId: "first-comment" } },
   { key: "second-post", payload: { commentId: "second-comment" } },
@@ -80,8 +73,7 @@ chatEvents.sendMany([
   },
 ])
 
-const activityStream: AsyncGenerator<ActivityEvent, void, unknown> =
-  activityEvents.on("all")
+const activityStream: AsyncGenerator<ActivityEvent, void, unknown> = activityEvents.on("all")
 const createdActivityStream: AsyncGenerator<CreatedActivity, void, unknown> =
   activityEvents.on<CreatedActivity>("created")
 

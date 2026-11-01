@@ -78,9 +78,7 @@ interface CommentEvent {
   commentId: string
 }
 
-export const commentEvents = defineEventChannel<CommentEvent>(
-  postId => `post:${postId}:comment`,
-)
+export const commentEvents = defineEventChannel<CommentEvent>(postId => `post:${postId}:comment`)
 ```
 
 `commentEvents` represents the whole family, and a post ID selects one subchannel when the application publishes or subscribes.
@@ -89,9 +87,7 @@ Event keys are strings by default.
 Supply the second generic argument when a channel uses another key type.
 
 ```ts
-defineEventChannel<ChatEvent, SessionKey>(
-  session => `chat:${session.userId}:${session.scope}`,
-)
+defineEventChannel<ChatEvent, SessionKey>(session => `chat:${session.userId}:${session.scope}`)
 ```
 
 ## Send and receive events
@@ -305,11 +301,12 @@ import { defineDependency } from "ripple-di"
 import { publisher } from "#events/publisher"
 
 export const useEventBus = defineDependency(
-  () => createPgEventBus({
-    connectionString: databaseUrl,
-    channel: "my-app",
-    publisher,
-  }),
+  () =>
+    createPgEventBus({
+      connectionString: databaseUrl,
+      channel: "my-app",
+      publisher,
+    }),
   {
     dispose: eventBus => eventBus.close(),
   },
@@ -329,9 +326,7 @@ import { defineEventChannel } from "#events"
 
 export const logEvents = defineEventChannel<LogEvent>("log")
 
-export const commentEvents = defineEventChannel<CommentEvent>(
-  postId => `post:${postId}:comment`,
-)
+export const commentEvents = defineEventChannel<CommentEvent>(postId => `post:${postId}:comment`)
 ```
 
 ### Scoped channels
@@ -368,14 +363,11 @@ After the operation, pass `logEvents` to `payloadsFor()` to inspect its recorded
 
 ```ts
 test("publishes a log event through the override", async () => {
-  await withOverrides(
-    provide(useEventBus, testEventBus),
-    () => logEvents.send({ message: "Comment created" }),
+  await withOverrides(provide(useEventBus, testEventBus), () =>
+    logEvents.send({ message: "Comment created" }),
   )
 
-  expect(testEventBus.payloadsFor(logEvents)).toEqual([
-    { message: "Comment created" },
-  ])
+  expect(testEventBus.payloadsFor(logEvents)).toEqual([{ message: "Comment created" }])
 })
 ```
 
@@ -383,9 +375,8 @@ For a keyed channel, `payloadsFor()` additionally takes the selected subchannel 
 
 ```ts
 test("publishes a comment event through the override", async () => {
-  await withOverrides(
-    provide(useEventBus, testEventBus),
-    () => commentEvents.send("post-id", {
+  await withOverrides(provide(useEventBus, testEventBus), () =>
+    commentEvents.send("post-id", {
       eventType: "created",
       commentId: "comment-id",
     }),
@@ -406,9 +397,7 @@ Bind the channel with `for()`, then supply the expected subtype to `payloadsFor(
 This two-step form keeps the channel payload and key types inferred while checking that the requested subtype belongs to the channel payload.
 
 ```ts
-const createdEvents = testEventBus
-  .for(activityEvents)
-  .payloadsFor<CommentCreatedEvent>("created")
+const createdEvents = testEventBus.for(activityEvents).payloadsFor<CommentCreatedEvent>("created")
 ```
 
 `payloadsFor()` resolves the event names of a scoped channel in the context where it runs, so inspect the channel inside the same scope that published its events.

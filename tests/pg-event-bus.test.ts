@@ -19,9 +19,7 @@ const listenerApplicationName = `${postgresChannel}_listener`
 const querySeparator = connectionString.includes("?") ? "&" : "?"
 const listenerConnectionString = `${connectionString}${querySeparator}application_name=${listenerApplicationName}`
 const sql = postgres(connectionString, { max: 1 })
-const publisher = createPublisher(({ text, values }) =>
-  sql.unsafe(text, values),
-)
+const publisher = createPublisher(({ text, values }) => sql.unsafe(text, values))
 let bus: EventBus
 
 beforeAll(async () => {
@@ -39,9 +37,7 @@ afterAll(async () => {
 })
 
 it("delivers typed events between separate PostgreSQL connections", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `test:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `test:${key}`)
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -82,17 +78,14 @@ for (const kind of ["events", "gaps"] as const) {
       const stream = kind === "events" ? bus.on("return") : bus.deliveryGaps()
       const pending = started ? stream.next() : undefined
       expect(await stream.return()).toEqual({ value: undefined, done: true })
-      if (pending)
-        expect(await pending).toEqual({ value: undefined, done: true })
+      if (pending) expect(await pending).toEqual({ value: undefined, done: true })
       expect(await stream.next()).toEqual({ value: undefined, done: true })
     })
   }
 }
 
 it("delivers a publication batch in input order", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `batch:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `batch:${key}`)
   const controller = new AbortController()
   const stream = events.on("same", controller.signal)
   const firstReceived = stream.next()
@@ -115,9 +108,7 @@ it("delivers a publication batch in input order", async () => {
 })
 
 it("delivers a notification only after its publishing transaction commits", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `commit:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `commit:${key}`)
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -135,9 +126,7 @@ it("delivers a notification only after its publishing transaction commits", asyn
 })
 
 it("does not deliver a notification from a rolled-back transaction", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `rollback:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `rollback:${key}`)
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -152,9 +141,7 @@ it("does not deliver a notification from a rolled-back transaction", async () =>
 })
 
 it("keeps active streams subscribed after the listener reconnects", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `reconnect:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `reconnect:${key}`)
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -226,9 +213,7 @@ it("reports a possible delivery gap after each successful reconnect", async () =
 })
 
 it("ignores malformed notifications without closing active streams", async () => {
-  const events = createEventChannelFactory(bus)<TestEvent>(
-    (key) => `malformed:${key}`,
-  )
+  const events = createEventChannelFactory(bus)<TestEvent>(key => `malformed:${key}`)
   const controller = new AbortController()
   const stream = events.on("first", controller.signal)
   const received = stream.next()
@@ -251,16 +236,14 @@ it("completes active streams when the bus closes", async () => {
   })
   await closingBus.ready
 
-  const events = createEventChannelFactory(closingBus)<TestEvent>((key) => key)
+  const events = createEventChannelFactory(closingBus)<TestEvent>(key => key)
   const stream = events.on("pending")
   const received = stream.next()
   expect(closingBus[Symbol.asyncDispose]).toBe(closingBus.close)
   await closingBus[Symbol.asyncDispose]()
 
   expect(await received).toEqual({ value: undefined, done: true })
-  await expect(
-    events.send("pending", { id: "after-close", value: 4 }),
-  ).rejects.toThrow(
+  await expect(events.send("pending", { id: "after-close", value: 4 })).rejects.toThrow(
     "Cannot send an event after the PostgreSQL event bus is closed",
   )
   await closingBus.close()
@@ -268,17 +251,11 @@ it("completes active streams when the bus closes", async () => {
 
 async function settlesWithin<T>(promise: Promise<T>, milliseconds: number) {
   const marker = Symbol("pending")
-  const result = await Promise.race([
-    promise,
-    Bun.sleep(milliseconds).then(() => marker),
-  ])
+  const result = await Promise.race([promise, Bun.sleep(milliseconds).then(() => marker)])
   return result !== marker
 }
 
-async function withTimeout<T>(
-  promise: Promise<T>,
-  milliseconds: number,
-): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
   return Promise.race([
     promise,
     Bun.sleep(milliseconds).then(() => {

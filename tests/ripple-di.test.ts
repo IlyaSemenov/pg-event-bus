@@ -11,9 +11,7 @@ interface CommentEvent {
 const production = createTestEventBus()
 const useEventBus = defineDependency<EventBus>(() => production)
 const defineEventChannel = createEventChannelFactory(useEventBus)
-const commentEvents = defineEventChannel<CommentEvent>(
-  (postId) => `post:${postId}:comment`,
-)
+const commentEvents = defineEventChannel<CommentEvent>(postId => `post:${postId}:comment`)
 
 it("resolves a scoped override after the domain channel is declared", async () => {
   const test = createTestEventBus()
@@ -41,7 +39,7 @@ it("isolates and inspects scoped channels in the current dependency context", as
   const test = createTestEventBus()
   const useTenant = defineDependency<string>({ name: "tenant" })
   const defineTenantEventChannel = createEventChannelFactory(useEventBus, {
-    scopeEventName: (event) => `tenant:${useTenant()}:${event}`,
+    scopeEventName: event => `tenant:${useTenant()}:${event}`,
   })
   const logEvents = defineTenantEventChannel<string>("log")
   const inTenant = <T>(tenant: string, fn: () => T) =>
@@ -52,12 +50,8 @@ it("isolates and inspects scoped channels in the current dependency context", as
   await inTenant("one", () => logEvents.send("one-message"))
 
   expect((await tenantOneEvents.next()).value).toBe("one-message")
-  expect(await inTenant("one", () => test.payloadsFor(logEvents))).toEqual([
-    "one-message",
-  ])
-  expect(await inTenant("two", () => test.payloadsFor(logEvents))).toEqual([
-    "two-message",
-  ])
+  expect(await inTenant("one", () => test.payloadsFor(logEvents))).toEqual(["one-message"])
+  expect(await inTenant("two", () => test.payloadsFor(logEvents))).toEqual(["two-message"])
 
   await tenantOneEvents.return()
 })

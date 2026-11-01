@@ -94,9 +94,7 @@ export function streamEvents<TPayload>(
       if (event !== "error") {
         eventEmitter.on("error", fail)
       }
-      busAbortListener = addAbortListener(busSignal, () =>
-        fail(busSignal.reason),
-      )
+      busAbortListener = addAbortListener(busSignal, () => fail(busSignal.reason))
       if (userSignal) {
         userAbortListener = addAbortListener(userSignal, () => finish())
       }

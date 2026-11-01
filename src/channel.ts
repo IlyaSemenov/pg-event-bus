@@ -34,9 +34,7 @@ export interface KeyedEventChannel<TPayload, TKey = string> {
   /** Publishes a payload under the event name built from `key`. */
   send(key: TKey, payload: TPayload): Promise<void>
   /** Publishes several typed events as one transport batch. */
-  sendMany(
-    events: readonly KeyedEventChannelEvent<TPayload, TKey>[],
-  ): Promise<void>
+  sendMany(events: readonly KeyedEventChannelEvent<TPayload, TKey>[]): Promise<void>
   /**
    * Streams payloads published under the event name built from `key` until the signal aborts.
    *
@@ -70,10 +68,7 @@ export interface EventBus extends AsyncDisposable {
   /** Publishes several events as one transport batch. */
   sendMany(events: readonly EventBusEvent[]): Promise<void>
   /** Streams payloads published under a fully built event name until the signal aborts. */
-  on<TPayload>(
-    event: string,
-    signal?: AbortSignal,
-  ): AsyncGenerator<TPayload, void, unknown>
+  on<TPayload>(event: string, signal?: AbortSignal): AsyncGenerator<TPayload, void, unknown>
   /**
    * Streams possible delivery gaps reported after the listener reconnects until the signal aborts.
    * The initial connection does not produce a gap signal.
@@ -94,9 +89,7 @@ export interface DefineEventChannel {
    *
    * Event keys are strings unless a different `TKey` is supplied.
    */
-  <TPayload, TKey = string>(
-    buildName: (key: TKey) => string,
-  ): KeyedEventChannel<TPayload, TKey>
+  <TPayload, TKey = string>(buildName: (key: TKey) => string): KeyedEventChannel<TPayload, TKey>
 }
 
 /** Options shared by every channel created by one channel factory. */
@@ -132,9 +125,7 @@ export function createEventChannelFactory(
   { scopeEventName }: EventChannelFactoryOptions = {},
 ): DefineEventChannel {
   const getEventBus =
-    typeof eventBusOrResolver === "function"
-      ? eventBusOrResolver
-      : () => eventBusOrResolver
+    typeof eventBusOrResolver === "function" ? eventBusOrResolver : () => eventBusOrResolver
 
   function defineEventChannel<TPayload>(event: string): EventChannel<TPayload>
   function defineEventChannel<TPayload, TKey = string>(
@@ -144,17 +135,13 @@ export function createEventChannelFactory(
     eventOrBuildName: string | ((key: TKey) => string),
   ): EventChannel<TPayload> | KeyedEventChannel<TPayload, TKey> {
     const buildEventName =
-      typeof eventOrBuildName === "string"
-        ? () => eventOrBuildName
-        : eventOrBuildName
+      typeof eventOrBuildName === "string" ? () => eventOrBuildName : eventOrBuildName
     const buildName = scopeEventName
       ? (key: TKey) => scopeEventName(buildEventName(key))
       : buildEventName
     const channel =
       typeof eventOrBuildName === "string"
-        ? createEventChannel<TPayload>(getEventBus, () =>
-            buildName(undefined as TKey),
-          )
+        ? createEventChannel<TPayload>(getEventBus, () => buildName(undefined as TKey))
         : createKeyedEventChannel<TPayload, TKey>(getEventBus, buildName)
 
     registerEventChannel(channel, buildName)
@@ -170,12 +157,10 @@ function createEventChannel<TPayload>(
   getEvent: () => string,
 ): EventChannel<TPayload> {
   return {
-    send: (payload) => getEventBus().send(getEvent(), payload),
-    sendMany: (payloads) => {
+    send: payload => getEventBus().send(getEvent(), payload),
+    sendMany: payloads => {
       const event = getEvent()
-      return getEventBus().sendMany(
-        payloads.map((payload) => ({ event, payload })),
-      )
+      return getEventBus().sendMany(payloads.map(payload => ({ event, payload })))
     },
     on: <TEvent extends TPayload = TPayload>(signal?: AbortSignal) =>
       getEventBus().on<TEvent>(getEvent(), signal),
@@ -188,7 +173,7 @@ function createKeyedEventChannel<TPayload, TKey>(
 ): KeyedEventChannel<TPayload, TKey> {
   return {
     send: (key, payload) => getEventBus().send(buildName(key), payload),
-    sendMany: (events) =>
+    sendMany: events =>
       getEventBus().sendMany(
         events.map(({ key, payload }) => ({
           event: buildName(key),

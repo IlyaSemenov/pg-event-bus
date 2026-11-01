@@ -7,7 +7,7 @@ it("resolves the event bus lazily for dependency injection", async () => {
   const bus2 = createTestEventBus()
   let current: EventBus = bus1.bus
   const defineEventChannel = createEventChannelFactory(() => current)
-  const events = defineEventChannel<{ id: string }>((key) => `entity:${key}`)
+  const events = defineEventChannel<{ id: string }>(key => `entity:${key}`)
 
   await events.send("one", { id: "first" })
   current = bus2.bus
@@ -16,9 +16,7 @@ it("resolves the event bus lazily for dependency injection", async () => {
     { key: "three", payload: { id: "third" } },
   ])
 
-  expect(bus1.calls).toEqual([
-    { event: "entity:one", payload: { id: "first" } },
-  ])
+  expect(bus1.calls).toEqual([{ event: "entity:one", payload: { id: "first" } }])
   expect(bus2.calls).toEqual([
     { event: "entity:two", payload: { id: "second" } },
     { event: "entity:three", payload: { id: "third" } },
@@ -51,21 +49,17 @@ it("uses a fixed event name and resolves the event bus for every operation", asy
       { event: "activity_log", payload: { id: "third" } },
     ],
   ])
-  expect(test.subscriptions).toEqual([
-    { event: "activity_log", signal: controller.signal },
-  ])
+  expect(test.subscriptions).toEqual([{ event: "activity_log", signal: controller.signal }])
 })
 
 it("scopes the event names of every channel for every operation", async () => {
   const test = createTestEventBus()
   let scope = "one"
   const defineEventChannel = createEventChannelFactory(test.bus, {
-    scopeEventName: (event) => `${scope}:${event}`,
+    scopeEventName: event => `${scope}:${event}`,
   })
   const logEvents = defineEventChannel<{ id: string }>("log")
-  const entityEvents = defineEventChannel<{ id: string }>(
-    (key) => `entity:${key}`,
-  )
+  const entityEvents = defineEventChannel<{ id: string }>(key => `entity:${key}`)
   const controller = new AbortController()
 
   await logEvents.send({ id: "first" })
