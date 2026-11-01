@@ -10,6 +10,6 @@ export default defineConfig({
   exports: true,
   publint: true,
   attw: {
-    profile: "strict",
+    profile: "esm-only",
   },
 })
