@@ -51,3 +51,12 @@ jobs:
         run: bun run test
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost
+
+      # The lockfile pins the newest Postgres.js; also check the oldest supported version.
+      - name: Test package with Postgres.js 3
+        run: |
+          bun add postgres@3.4.9 --no-save
+          bun run types
+          bun run test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost

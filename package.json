@@ -37,7 +37,7 @@
     "release:check": "bun run build && bun run types && bun run test"
   },
   "dependencies": {
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9 || ^4.1.0"
   },
   "devDependencies": {
     "@arethetypeswrong/core": "^0.18.5",
