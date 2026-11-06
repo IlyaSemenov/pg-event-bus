@@ -23,8 +23,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
@@ -33,7 +32,9 @@
     "test": "bun test",
     "prepublishOnly": "bun run build",
     "lint": "oxlint --fix && oxfmt",
-    "lint:check": "oxlint && oxfmt --check"
+    "lint:check": "oxlint && oxfmt --check",
+    "release": "changesets-local",
+    "release:check": "bun run build && bun run types && bun run test"
   },
   "dependencies": {
     "postgres": "^3.4.9"
@@ -44,6 +45,7 @@
     "@ilyasemenov/oxc-config": "^0.1.1",
     "@tsconfig/bun": "^1.0.11",
     "@types/bun": "^1.4.4",
+    "changesets-local": "^1.5.0",
     "oxfmt": "^0.75.0",
     "oxlint": "^1.90.0",
     "publint": "^0.3.25",
