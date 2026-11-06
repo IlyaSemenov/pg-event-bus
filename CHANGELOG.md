@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.3.0
+
+### Minor Changes
+
+- fd82df6: Support Postgres.js 4.1 or later alongside Postgres.js 3.4.9 or later.
+
 ## 4.2.0
 
 ### Minor Changes
