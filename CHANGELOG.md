@@ -1,5 +1,11 @@
 # pg-event-bus
 
+## 4.4.0
+
+### Minor Changes
+
+- 540d943: Send events of up to about 1 MB instead of failing above the 8000-byte PostgreSQL notification limit; listeners on earlier versions discard such large events.
+
 ## 4.3.0
 
 ### Minor Changes

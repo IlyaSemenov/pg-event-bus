@@ -1,6 +1,6 @@
 {
   "name": "pg-event-bus",
-  "version": "4.3.0",
+  "version": "4.4.0",
   "description": "Typed real-time events over PostgreSQL LISTEN/NOTIFY for cache invalidation and live updates.",
   "homepage": "https://github.com/IlyaSemenov/pg-event-bus#readme",
   "bugs": "https://github.com/IlyaSemenov/pg-event-bus/issues",
