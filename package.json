@@ -45,7 +45,7 @@
     "@ilyasemenov/oxc-config": "^0.1.1",
     "@tsconfig/bun": "^1.0.11",
     "@types/bun": "^1.4.4",
-    "changesets-local": "^1.5.0",
+    "changesets-local": "^1.6.0",
     "oxfmt": "^0.75.0",
     "oxlint": "^1.90.0",
     "publint": "^0.3.25",

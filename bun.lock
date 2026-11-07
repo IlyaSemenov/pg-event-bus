@@ -13,7 +13,7 @@
         "@ilyasemenov/oxc-config": "^0.1.1",
         "@tsconfig/bun": "^1.0.11",
         "@types/bun": "^1.4.4",
-        "changesets-local": "^1.5.0",
+        "changesets-local": "^1.6.0",
         "oxfmt": "^0.75.0",
         "oxlint": "^1.90.0",
         "publint": "^0.3.25",
@@ -330,7 +330,7 @@
 
     "cacheable": ["cacheable@2.5.0", "", { "dependencies": { "@cacheable/memory": "^2.2.0", "@cacheable/utils": "^2.5.0", "hookified": "^1.15.0", "keyv": "^5.6.0", "qified": "^0.10.1" } }, "sha512-60cyAOytib/OzBw1JNSoSV/boK1AtHryDIjvVBk7XbN4ugfkM3+Sry7fEjNgPMGgOjuaZPAp8ruZ0Cxafwyq9g=="],
 
-    "changesets-local": ["changesets-local@1.5.0", "", { "bin": { "changesets-local": "dist/cli.mjs" } }, "sha512-/VmU6R3zZ7WG1IQUq/nDRSKaaeRO/k2Z0c6psKF3qHnfY4dA3W6nmBfY2oVFxF+I+0X+eiIKZg6UM7csvFaHlA=="],
+    "changesets-local": ["changesets-local@1.6.0", "", { "bin": { "changesets-local": "dist/cli.mjs" } }, "sha512-c7U00YJKE/BBLpueixqoMtR8c2sHcOtaInHAaQhLawK3hbYT6Hk5lQJ74uLNyd8/2I8c6dVL8XWz/BB2DYOg/w=="],
 
     "cjs-module-lexer": ["cjs-module-lexer@1.4.3", "", {}, "sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q=="],
 
