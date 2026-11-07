@@ -31,6 +31,9 @@ The package is ORM-agnostic and contains no ORM-specific adapters.
 `createPublisher` builds one parameterized `pg_notify` query and delegates its execution to the application's current database connection.
 `createRawPublisher` delegates the readonly notification array instead, including when `send()` publishes one event.
 
+An event whose encoded message exceeds the notification payload limit travels as consecutive chunk notifications published in one transaction.
+The listener reassembles chunks relying on PostgreSQL delivering one transaction's notifications contiguously, and discards a chunk sequence interrupted by any other notification or longer than the chunk limit.
+
 Each `deliveryGaps()` call creates an independent stream that receives a signal after every successful listener reconnection, but not after the initial `LISTEN`.
 Delivery gap streams honor their consumer abort signal and complete when the bus closes.
 Consumer failures must not affect listener reconnection or other delivery gap streams.

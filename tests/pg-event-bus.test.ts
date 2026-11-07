@@ -108,6 +108,19 @@ it("delivers a publication batch in input order", async () => {
   controller.abort()
 })
 
+it("delivers events larger than one notification in batch order", async () => {
+  const events = createEventChannelFactory(bus)<string>("large")
+  const controller = new AbortController()
+  const stream = events.on(controller.signal)
+  const payloads = ["привет ".repeat(5_000), "small", '"quoted"'.repeat(5_000)]
+  const received = payloads.map(() => stream.next())
+
+  await events.sendMany(payloads)
+
+  expect(await Promise.all(received)).toEqual(payloads.map(value => ({ value, done: false })))
+  controller.abort()
+})
+
 it("delivers a notification only after its publishing transaction commits", async () => {
   const events = createEventChannelFactory(bus)<TestEvent>(key => `commit:${key}`)
   const controller = new AbortController()

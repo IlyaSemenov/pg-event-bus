@@ -2,14 +2,15 @@
 export interface PgNotification {
   /** PostgreSQL channel supplied when the event bus was created. */
   channel: string
-  /** JSON-encoded event name and payload accepted by `pg_notify`. */
+  /** JSON-encoded notification payload accepted by `pg_notify`. */
   payload: string
 }
 
 /**
  * Publishes encoded notifications in one call through an application-owned database connection.
  *
- * Notifications are ordered as passed to `sendMany()`, and the publisher must preserve that order.
+ * Notifications are ordered as passed to `sendMany()`, and an event too large for one notification spans several consecutive ones.
+ * The publisher must preserve that order and publish all notifications of one call in one transaction, such as with one statement.
  * The returned value is awaited so a transaction cannot finish before publication completes.
  */
 export type PgEventPublisher = (

@@ -205,6 +205,7 @@ The PostgreSQL and in-memory test buses also implement the asynchronous disposal
 ## Custom adapters
 
 An adapter that cannot execute the `{ text, values }` query produced by `createPublisher()` can use `createRawPublisher()` as an escape hatch.
+Publish all notifications it receives in their order within one transaction, for example with one statement, because a large event spans several consecutive notifications.
 
 ```ts
 import { createRawPublisher } from "pg-event-bus"
@@ -236,11 +237,13 @@ Disconnected listeners miss events, reconnects do not replay history, and delive
 Use an outbox, job queue, or durable broker when every event must be processed.
 
 Payloads use JSON serialization and must be JSON-serializable.
-Keep them small: PostgreSQL notification payloads must be shorter than 8000 bytes with the default configuration, and the encoded event name counts toward that limit.
+An event too large for one PostgreSQL notification, which holds less than 8000 bytes, is split into several notifications and reassembled by listeners.
+Each notification passes through the PostgreSQL queue shared by all listeners of the database, so keep payloads within tens of kilobytes and send identifiers instead of larger data.
+An event cannot exceed about 1 MB of JSON, where quotes and backslashes count twice.
 
 PostgreSQL can also coalesce identical channel-and-payload notifications emitted within one transaction.
 
-Incoming notifications must contain a JSON object with a string `event` field.
+A notification published to the channel without the bus, such as from SQL, must contain a JSON object with a string `event` field.
 The `payload` field is optional.
 
 Notifications containing unparseable JSON or an invalid event envelope are discarded, and the listener continues receiving subsequent events.

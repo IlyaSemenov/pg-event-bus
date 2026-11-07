@@ -4,8 +4,8 @@ import postgres from "postgres"
 
 import type { EventBus, EventBusEvent } from "./channel"
 import { createDeliveryGaps } from "./gaps"
-import { decodeEventMessage, encodeEventMessage } from "./message"
-import type { PgEventPublisher } from "./publisher"
+import { createNotificationDecoder, encodeEventNotifications } from "./message"
+import type { PgEventPublisher, PgNotification } from "./publisher"
 import { streamEvents } from "./stream"
 
 /** Configuration for a PostgreSQL event bus. */
@@ -32,6 +32,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   const eventEmitter = new EventEmitter().setMaxListeners(0)
   const busAbort = new AbortController()
   const deliveryGaps = createDeliveryGaps(busAbort.signal)
+  const decodeNotification = createNotificationDecoder()
   let hasListened = false
   let closed = false
 
@@ -40,7 +41,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
   }
 
   function receive(payload: string) {
-    const message = decodeEventMessage(payload)
+    const message = decodeNotification(payload)
 
     if (message) {
       eventEmitter.emit(message.event, message.payload)
@@ -79,12 +80,7 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
       throw new Error("Cannot send an event after the PostgreSQL event bus is closed")
     }
 
-    await options.publisher([
-      {
-        channel: options.channel,
-        payload: encodeEventMessage(event, payload),
-      },
-    ])
+    await options.publisher(encodeNotifications(event, payload))
   }
 
   async function sendMany(events: readonly EventBusEvent[]) {
@@ -97,11 +93,15 @@ export function createPgEventBus(options: PgEventBusOptions): EventBus {
     }
 
     await options.publisher(
-      events.map(({ event, payload }) => ({
-        channel: options.channel,
-        payload: encodeEventMessage(event, payload),
-      })),
+      events.flatMap(({ event, payload }) => encodeNotifications(event, payload)),
     )
+  }
+
+  function encodeNotifications(event: string, payload: unknown): PgNotification[] {
+    return encodeEventNotifications(event, payload).map(notification => ({
+      channel: options.channel,
+      payload: notification,
+    }))
   }
 
   function onEvent<TPayload>(event: string, signal?: AbortSignal) {
